@@ -10,6 +10,7 @@ Configuration: a `.env` file in the repository root (git-ignored) with
 Commands
     create-coder --email a@b.edu --name "Ada" [--role coder|admin] [--password ...]   create the auth user + profile
     list-coders
+    set-password --email a@b.edu [--password ...]    new password (printed if generated)
     deactivate --email a@b.edu                      keeps the annotations, blocks login
     import --items path.json [--calibration-n N] [--rubric-text path.md] [--replace]
                                                     create a project + its items from the stage-10 JSON
@@ -92,6 +93,9 @@ class Client:
         return self._req("POST", "/auth/v1/admin/users",
                          body={"email": email, "password": password, "email_confirm": True, "user_metadata": {"display_name": name}})
 
+    def set_password(self, user_id: str, password: str):
+        return self._req("PUT", f"/auth/v1/admin/users/{user_id}", body={"password": password})
+
     def list_users(self):
         out = self._req("GET", "/auth/v1/admin/users", params={"per_page": 1000})
         return out.get("users", out) if isinstance(out, dict) else out
@@ -104,6 +108,15 @@ def cmd_create_coder(c: Client, a):
     c.insert("profiles", [{"user_id": uid, "display_name": a.name, "email": a.email, "role": a.role, "active": True}], upsert=True)
     print(f"created {a.role} {a.name} <{a.email}> user_id {uid}")
     print(f"temporary password: {pw}   (send it to the coder; they can change it later)")
+
+
+def cmd_set_password(c: Client, a):
+    prof = c.select("profiles", {"select": "user_id,display_name", "email": f"eq.{a.email}"})
+    if not prof:
+        sys.exit(f"no profile with email {a.email}")
+    pw = a.password or secrets.token_urlsafe(12)
+    c.set_password(prof[0]["user_id"], pw)
+    print(f"password set for {prof[0]['display_name']} <{a.email}>" + ("" if a.password else f": {pw}"))
 
 
 def cmd_list_coders(c: Client, a):
@@ -227,6 +240,7 @@ def main() -> None:
     s = sub.add_parser("create-coder"); s.add_argument("--email", required=True); s.add_argument("--name", required=True)
     s.add_argument("--role", default="coder", choices=["coder", "admin"]); s.add_argument("--password", default=None)
     sub.add_parser("list-coders")
+    s = sub.add_parser("set-password"); s.add_argument("--email", required=True); s.add_argument("--password", default=None)
     s = sub.add_parser("deactivate"); s.add_argument("--email", required=True)
     s = sub.add_parser("import"); s.add_argument("--items", required=True); s.add_argument("--calibration-n", type=int, default=None)
     s.add_argument("--rubric-text", default=None); s.add_argument("--replace", action="store_true")
@@ -237,7 +251,7 @@ def main() -> None:
     s = sub.add_parser("delete-project"); s.add_argument("--project", required=True); s.add_argument("--yes", action="store_true")
     a = ap.parse_args()
     c = Client(load_env())
-    {"create-coder": cmd_create_coder, "list-coders": cmd_list_coders, "deactivate": cmd_deactivate, "import": cmd_import,
+    {"create-coder": cmd_create_coder, "list-coders": cmd_list_coders, "set-password": cmd_set_password, "deactivate": cmd_deactivate, "import": cmd_import,
      "status": cmd_status, "export": cmd_export, "close": lambda c, a: cmd_set_status(c, a, "closed"),
      "reopen": lambda c, a: cmd_set_status(c, a, "open"), "delete-project": cmd_delete_project}[a.cmd](c, a)
 
