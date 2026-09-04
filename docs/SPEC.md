@@ -135,3 +135,18 @@ Where it lives: its own GitHub repository (`prism`), cloned outside the synesthe
 ## 10. Open decisions
 
 Supabase versus Firebase (either works; Supabase's Postgres makes the analysis export trivial and is the recommendation); whether to add a custom domain (unnecessary; `seannoah.github.io/prism/` is fine); and whether coders log in with Cal Poly email addresses only (recommended, to keep the roster tidy).
+
+
+## Addendum, 2026-09-04: implementation status and deviations from this plan
+
+Built and live as v1.2 (`seannoah.github.io/prism/`, repo `seannoah/prism`, Supabase project `colimjlptydvfsgoikyw`):
+schema + row-level security + `claim_next_item()` (001), per-project roster with a launcher, instructions text and a
+training gate with per-item feedback, invitation-based accounts with self-set passwords (002), and a lab dashboard
+(projects with coverage bars and editable settings, per-RA table with calibration agreement against a key, access matrix,
+calibration adjudication view) driven by admin-only database functions (003). Deviations: the annotation columns are
+`answers` / `revised_answers` (`values` is reserved inside Postgres function signatures); Supabase renamed the keys
+(publishable = anon, secret = service_role); invitations replace admin-set passwords; the "everyone codes the block,
+then a meeting" calibration is replaced by a rolling process (training → keyed calibration block → agreement figure in
+the dashboard → FAQ updates), since RAs join at different times; a CSV export includes hidden fields and is therefore
+treated like a KEY file. Phase-2 items still open: gold seeding in the pool, adjudication beyond the calibration block,
+hour reports, span/tag field types for passage-marking and taxonomy projects. Operations playbook: `CLAUDE.md` in the repo.

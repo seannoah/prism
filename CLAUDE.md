@@ -5,6 +5,16 @@ PRISM = Psychopharmacology Research Intern Scoring & Measurement Portal. A stati
 Spec: `docs/SPEC.md`. Owner: Sean Noah. This file tells a Claude session how to turn Sean's plain-English requests
 into the right commands. Run everything from this folder; `admin/prism_admin.py` needs only the system `python3`.
 
+## Status (update at the end of every session)
+- 2026-09-04: v1.2.3 live. Migrations applied by Sean: 001, 002. **003 (dashboard) pending** — until it is pasted into the
+  SQL editor the Admin tab shows an error. Accounts: Sean (admin, seannoah@gmail.com), Test Coder 1 / Test Coder 2
+  (prism-tester-1/2@example.com; passwords in `.env` TEST_CODER lines). Project `syn-A-passage-precision` imported
+  (300 items, coverage 2, calibration 20, rubric + instructions text, 12 training items from the primer's practice set);
+  Test Coder 1 and Sean are members; a few test answers exist → **re-import with `--replace` before the real round**.
+  Not yet built: gold seeding in the pool (v1.3), span and tag field types for the taxonomy projects, per-coder hour
+  reports, custom SMTP for invitations.
+- Rolling calibration flow (no synchronous meeting) is the adopted process; see the section below.
+
 ## Hard rules
 1. The SECRET key lives only in `.env` here (git-ignored). Never print it, paste it into chat, or commit it. The
    publishable key in `config.js` is public by design.
