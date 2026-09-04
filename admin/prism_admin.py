@@ -283,7 +283,7 @@ def cmd_status(c: Client, a):
     profiles = {p["user_id"]: p for p in c.select("profiles", {"select": "user_id,display_name,email"})}
     for p in projects:
         items = c.select("items", {"select": "id,seq,is_training", "project_id": f"eq.{p['id']}"})
-        ids = {i["id"] for i in items}
+        ids = {i["id"] for i in items if not i.get("is_training")}   # the histogram covers the pool only
         assigns = [x for x in c.select("assignments", {"select": "item_id,coder_id,status,claimed_at,expires_at"}) if x["item_id"] in ids]
         done = {}
         for x in assigns:
