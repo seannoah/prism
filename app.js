@@ -364,12 +364,130 @@
     });
   }
 
-  // ---------------------------------------------------------------- admin
+  // ---------------------------------------------------------------- admin dashboard (v1.2)
+  const adm = { overview: [], coders: [], tab: "projects" };
+  document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => {
+    adm.tab = b.dataset.tab;
+    document.querySelectorAll(".tab").forEach((x) => x.classList.toggle("active", x === b));
+    document.querySelectorAll(".tabpane").forEach((p) => (p.hidden = p.id !== `admin-${adm.tab}`));
+    if (adm.tab === "calibration") loadCalibration();
+  }));
+  function adminMsg(text, isErr) { const m = $("admin-msg"); m.textContent = text; m.hidden = !text; m.className = isErr ? "error" : "muted"; }
+  async function adminCall(fn, args, okText) {
+    const { error } = await sb.rpc(fn, args);
+    if (error) return adminMsg(error.message, true);
+    adminMsg(okText || "Saved.");
+    await loadAdmin();
+  }
   async function loadAdmin() {
-    const { data, error } = await sb.rpc("admin_project_stats");
-    const tb = $("admin-table").querySelector("tbody");
-    if (error) { tb.innerHTML = `<tr><td colspan="12" class="error">${esc(error.message)}</td></tr>`; return; }
-    tb.innerHTML = (data || []).map((r) => `<tr><td>${esc(r.name)}</td><td>${esc(r.status)}</td><td>${r.n_items}</td><td>${r.target_coverage}</td><td>${r.calibration_n}</td><td>${r.n_done}</td><td>${r.n_skipped}</td><td>${r.n_open_claims}</td><td>${r.items_at_target}</td><td>${r.coders_active}</td><td>${r.n_members ?? ""}</td><td>${r.n_trained ?? ""}${r.n_training ? ` (${r.n_training} items)` : ""}</td></tr>`).join("") || `<tr><td colspan="12" class="muted">No projects.</td></tr>`;
+    const [ov, co] = await Promise.all([sb.rpc("admin_overview"), sb.rpc("admin_coders")]);
+    if (ov.error || co.error) { $("admin-projects").innerHTML = `<p class="error">${esc((ov.error || co.error).message)} — has migration 003 been run?</p>`; return; }
+    adm.overview = ov.data || []; adm.coders = co.data || [];
+    renderAdminProjects(); renderAdminRAs(); renderAdminAccess();
+    $("cal-project").innerHTML = adm.overview.map((p) => `<option value="${p.project_id}">${esc(p.name)}</option>`).join("");
+    if (adm.tab === "calibration") loadCalibration();
+  }
+  function bar(done, total, cls) { const pct = total ? Math.round(100 * done / total) : 0; return `<span class="bar"><span class="${cls || ""}" style="width:${pct}%"></span></span> <span class="small">${done}/${total} (${pct}%)</span>`; }
+  function renderAdminProjects() {
+    const box = $("admin-projects");
+    if (!adm.overview.length) { box.innerHTML = `<p class="muted">No projects yet.</p>`; return; }
+    box.innerHTML = adm.overview.map((p) => {
+      const hist = Object.entries(p.coverage_hist || {}).sort((x, y) => Number(x[0]) - Number(y[0])).map(([k, v]) => `${k}: ${v}`).join(", ");
+      return `<div class="card" data-id="${p.project_id}"><div>
+        <h3>${esc(p.name)} <span class="small ${p.status === "open" ? "ok" : "warn"}">${esc(p.status)}</span></h3>
+        <div class="meta">${esc(p.description || "")}</div>
+        <div class="meta">Items at target coverage: ${bar(Number(p.items_at_target), Number(p.n_items), Number(p.items_at_target) === Number(p.n_items) && p.n_items > 0 ? "full" : "")}</div>
+        <div class="meta">Ratings done ${p.n_done} (${p.n_items} items × ${p.target_coverage} = ${Number(p.n_items) * Number(p.target_coverage)} needed) · skipped ${p.n_skipped} · open claims ${p.n_open_claims} · ${p.hours} h logged</div>
+        <div class="meta">Items by number of ratings: ${esc(hist || "–")} · members ${p.n_members} (${p.n_trained} trained) · training items ${p.n_training}</div>
+        <div class="meta tight">Target coverage <input type="number" min="1" max="10" value="${p.target_coverage}" data-f="target"> ·
+          calibration items <input type="number" min="0" value="${p.calibration_n}" data-f="cal"> ·
+          <label class="opt"><input type="checkbox" data-f="train" ${p.training_required ? "checked" : ""}> training required</label>
+          <button class="secondary save-project">Save</button>
+          <button class="secondary toggle-status">${p.status === "open" ? "Close project" : "Reopen"}</button></div>
+      </div></div>`;
+    }).join("");
+    box.querySelectorAll(".save-project").forEach((b) => b.addEventListener("click", () => {
+      const card = b.closest(".card");
+      adminCall("admin_set_project", { p_project: card.dataset.id, p_status: null, p_target: Number(card.querySelector('[data-f="target"]').value),
+                                       p_calibration: Number(card.querySelector('[data-f="cal"]').value), p_training_required: card.querySelector('[data-f="train"]').checked }, "Project settings saved.");
+    }));
+    box.querySelectorAll(".toggle-status").forEach((b) => b.addEventListener("click", () => {
+      const card = b.closest(".card"); const p = adm.overview.find((x) => x.project_id === card.dataset.id);
+      const next = p.status === "open" ? "closed" : "open";
+      if (next === "closed" && !confirm(`Close ${p.name}? Coders can no longer submit or revise until it is reopened.`)) return;
+      adminCall("admin_set_project", { p_project: p.project_id, p_status: next, p_target: null, p_calibration: null, p_training_required: null }, `Project ${next}.`);
+    }));
+  }
+  function renderAdminRAs() {
+    const box = $("admin-ras");
+    const people = [...new Map(adm.coders.map((r) => [r.user_id, r])).values()];
+    if (!people.length) { box.innerHTML = `<p class="muted">No accounts.</p>`; return; }
+    const projects = adm.overview;
+    let html = `<table class="small"><thead><tr><th>RA</th><th>Role</th><th>Active</th>` + projects.map((p) => `<th>${esc(p.name)}</th>`).join("") + `</tr></thead><tbody>`;
+    for (const person of people) {
+      html += `<tr><td>${esc(person.display_name)}<br><span class="muted">${esc(person.email || "")}</span></td><td>${esc(person.role)}</td>` +
+        `<td><button class="secondary tight-btn set-active" data-user="${person.user_id}" data-active="${person.active ? 0 : 1}">${person.active ? "Deactivate" : "Activate"}</button></td>`;
+      for (const p of projects) {
+        const r = adm.coders.find((x) => x.user_id === person.user_id && x.project_id === p.project_id);
+        if (!r || !r.member) { html += `<td class="muted">–</td>`; continue; }
+        const cal = r.calibration_with_key > 0 ? ` · calibration agreement ${Math.round(100 * Number(r.calibration_agreement))}% (${r.calibration_with_key} keyed)` : (Number(r.calibration_coded) ? ` · ${r.calibration_coded} calibration items coded` : "");
+        html += `<td>${r.n_done} done, ${r.n_skipped} skipped, ${r.hours} h<br><span class="muted">training ${r.training_done_at ? "done" : "pending"}${r.last_seen ? " · last " + new Date(r.last_seen).toLocaleDateString() : ""}${esc(cal)}</span>` +
+                `<br><button class="link reset-training" data-user="${person.user_id}" data-project="${p.project_id}">reset training</button></td>`;
+      }
+      html += `</tr>`;
+    }
+    box.innerHTML = html + `</tbody></table>`;
+    box.querySelectorAll(".set-active").forEach((b) => b.addEventListener("click", () => adminCall("admin_set_active", { p_user: b.dataset.user, p_active: b.dataset.active === "1" }, "Account updated.")));
+    box.querySelectorAll(".reset-training").forEach((b) => b.addEventListener("click", () => { if (confirm("Reset this coder's training for the project?")) adminCall("admin_reset_training", { p_user: b.dataset.user, p_project: b.dataset.project }, "Training reset."); }));
+  }
+  function renderAdminAccess() {
+    const box = $("admin-access");
+    const people = [...new Map(adm.coders.map((r) => [r.user_id, r])).values()];
+    const projects = adm.overview;
+    if (!people.length || !projects.length) { box.innerHTML = `<p class="muted">Nothing to show yet.</p>`; return; }
+    let html = `<p class="muted">Tick a box to give an RA access to a project (they then see it on their launcher); untick to remove it. Their existing answers are kept.</p>` +
+      `<table class="small"><thead><tr><th>RA</th>` + projects.map((p) => `<th>${esc(p.name)}</th>`).join("") + `</tr></thead><tbody>`;
+    for (const person of people) {
+      html += `<tr><td>${esc(person.display_name)}</td>` + projects.map((p) => {
+        const r = adm.coders.find((x) => x.user_id === person.user_id && x.project_id === p.project_id);
+        return `<td><input type="checkbox" class="grant" data-user="${person.user_id}" data-project="${p.project_id}" ${r && r.member ? "checked" : ""}></td>`;
+      }).join("") + `</tr>`;
+    }
+    box.innerHTML = html + `</tbody></table>`;
+    box.querySelectorAll(".grant").forEach((cb) => cb.addEventListener("change", () =>
+      adminCall(cb.checked ? "admin_grant" : "admin_revoke", { p_user: cb.dataset.user, p_project: cb.dataset.project }, cb.checked ? "Access granted." : "Access removed.")));
+  }
+  $("cal-project").addEventListener("change", loadCalibration);
+  async function loadCalibration() {
+    const pid = $("cal-project").value;
+    const box = $("cal-list");
+    if (!pid) { box.innerHTML = ""; return; }
+    const project = adm.overview.find((p) => p.project_id === pid);
+    const { data: specRow } = await sb.from("projects").select("form_spec").eq("id", pid).maybeSingle();
+    const spec = specRow?.form_spec || [];
+    const { data, error } = await sb.rpc("admin_calibration_items", { p_project: pid });
+    if (error) { box.innerHTML = `<p class="error">${esc(error.message)}</p>`; return; }
+    if (!data?.length) { box.innerHTML = `<p class="muted">This project has no calibration block (calibration items = 0).</p>`; return; }
+    box.innerHTML = `<p class="muted">The first ${project.calibration_n} items of the pool, with every coder's answer. Set a key for an item to make agreement with it count in the RA table; the key is never shown to coders on real items.</p>` +
+      data.map((it) => {
+        const rows = (it.answers || []).map((a) => `<tr><td>${esc(a.coder)}</td><td>${esc(JSON.stringify(a.answers))}</td><td>${a.confidence ?? ""}</td><td>${esc(a.notes || "")}</td></tr>`).join("");
+        return `<div class="calitem" data-id="${it.item_id}"><div><strong>${esc(it.external_id)}</strong> (item ${it.seq + 1}) ${it.gold_values ? `<span class="ok small">key set: ${esc(JSON.stringify(it.gold_values))}</span>` : `<span class="muted small">no key yet</span>`}</div>` +
+          `<div class="text">${esc(it.display?.text || "")}</div>` +
+          (rows ? `<table><thead><tr><th>coder</th><th>answer</th><th>conf.</th><th>notes</th></tr></thead><tbody>${rows}</tbody></table>` : `<p class="muted small">No answers yet.</p>`) +
+          `<button class="link set-key">${it.gold_values ? "Change the key" : "Set the key"}</button><div class="keyform" hidden></div></div>`;
+      }).join("");
+    box.querySelectorAll(".set-key").forEach((b) => b.addEventListener("click", () => {
+      const holder = b.parentElement.querySelector(".keyform"); const it = data.find((x) => x.item_id === b.parentElement.dataset.id);
+      holder.hidden = false;
+      holder.innerHTML = `<form id="key-${it.item_id}"></form><label>Explanation shown to coders in training (optional) <textarea class="expl">${esc(it.explanation || "")}</textarea></label><button class="save-key">Save key</button> <button class="secondary cancel-key">Cancel</button>`;
+      renderForm(spec, it.gold_values || null, holder.querySelector("form"));
+      holder.querySelector(".cancel-key").addEventListener("click", () => (holder.hidden = true));
+      holder.querySelector(".save-key").addEventListener("click", async () => {
+        const vals = readValues(holder.querySelector("form"));
+        await adminCall("admin_set_gold", { p_item: it.item_id, p_gold: vals, p_explanation: holder.querySelector(".expl").value || null }, "Key saved.");
+        loadCalibration();
+      });
+    }));
   }
 
   route();

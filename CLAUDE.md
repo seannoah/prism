@@ -34,13 +34,30 @@ into the right commands. Run everything from this folder; `admin/prism_admin.py`
 | "set up project X from the analysis" | `import --items ../Synesthesia/Results/validation/prism/<X>.json --calibration-n 20 --rubric-text ../Synesthesia/Docs/coding_rubric.md --instructions-text <md>`; then `import-training --project <name> --items <training.json>`; then grants |
 | "update the instructions for X" | edit the markdown, then `set-instructions --project <name> --file <md>` |
 | "pull the coding data into the analysis" | `sync-exports --out-dir ../Synesthesia/Results/validation/prism_exports` then commit in `../Synesthesia` and run `Analysis/11_validation_analysis.py` |
-| "close project X" / "reopen" | `close --project <name>` / `reopen --project <name>` |
+| "close project X" / "reopen" | `close --project <name>` / `reopen --project <name>` (also a button in the dashboard) |
+| "raise the coverage of X to 3" / "make the first 30 items calibration" | `set-project --project <name> --target 3` / `--calibration 30` (also editable in the dashboard; takes effect on the next claim) |
+| "add these items to X" | `add-items --project <name> --items <json>` (pool grows; nothing else changes) |
 | "someone is locked out" | `set-password --email ... --password '...'` (Sean runs it himself so the password never appears in chat), or tell them to use "Forgot your password?" on the site |
 | "a coder left" | `deactivate --email ...` (annotations stay) |
 | "is the security still right?" | fill the TEST_CODER lines in `.env` with two dummy accounts and run `python3 tests/test_coder_permissions.py` (it codes one item as the dummy coder: re-import the project with `--replace` before a real round) |
 
 Project names are the `name` field of the import JSON (`syn-A-passage-precision`, `syn-BC-recall`, `syn-D-same-modality`,
 `syn-E-label-mapping`).
+
+## The lab dashboard (Admin tab, admins only; migration 003)
+Projects tab: coverage bars, ratings done / needed, items-by-number-of-ratings, members and training, editable target
+coverage / calibration size / training-required, close or reopen. RAs tab: per RA and project done / skipped / hours /
+last active / training / calibration agreement with the key; activate or deactivate; reset training. Access tab: RA ×
+project tick boxes (= grant / revoke). Calibration tab: the calibration block with every coder's answer; set the key
+per item (used for the agreement figure and, if the item is also a training item, for feedback). What the dashboard
+cannot do: invite accounts (needs the secret key) and import projects or items (file-based) - those stay here.
+
+## Calibration without a synchronous meeting (recommended flow for a rolling roster)
+1. Every newcomer completes the training items (feedback per item) at their own pace.
+2. The calibration block (first N pool items, identical for everyone) is coded next; Sean keys those items once in
+   the Calibration tab, so each newcomer's agreement with the key appears in the RAs tab without a group meeting.
+3. Disagreements become FAQ lines in the instructions (`set-instructions`), which every RA sees at the next session.
+4. Gold seeding (a small share of keyed items mixed into the pool for continuous drift checks) is planned as v1.3.
 
 ## How a project flows
 import (items with `display` for coders, `hidden` for the analysis) → optional training items with `gold_values` +

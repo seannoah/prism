@@ -105,9 +105,17 @@
   </section>
 
   <section id="screen-admin" class="screen" hidden>
-    <h1>Projects</h1>
-    <table id="admin-table"><thead><tr><th>Project</th><th>Status</th><th>Items</th><th>Target</th><th>Calibration</th><th>Done</th><th>Skipped</th><th>Open claims</th><th>Items at target</th><th>Coders</th><th>Members</th><th>Trained</th></tr></thead><tbody></tbody></table>
-    <p class="muted">Invitations, grants, imports and exports run from <code>admin/prism_admin.py</code> with the secret key (see the PRISM CLAUDE.md playbook).</p>
+    <h1>Lab dashboard</h1>
+    <div class="tabs"><button class="tab active" data-tab="projects">Projects</button><button class="tab" data-tab="ras">RAs</button><button class="tab" data-tab="access">Access</button><button class="tab" data-tab="calibration">Calibration</button></div>
+    <p id="admin-msg" class="muted" hidden></p>
+    <div id="admin-projects" class="tabpane"></div>
+    <div id="admin-ras" class="tabpane" hidden></div>
+    <div id="admin-access" class="tabpane" hidden></div>
+    <div id="admin-calibration" class="tabpane" hidden>
+      <label>Project <select id="cal-project"></select></label>
+      <div id="cal-list"></div>
+    </div>
+    <p class="muted">New RA accounts (invitations) and new projects or items are created from the command line, or by asking Claude with the PRISM playbook; everything else can be done here.</p>
   </section>
 </main>
 <footer></footer>

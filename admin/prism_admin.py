@@ -21,6 +21,8 @@ Commands
     reset-training --email a@b.edu --project NAME   let a coder redo the training
     import-training --project NAME --items training.json [--replace]   training items (gold answers + explanations)
     set-instructions --project NAME --file path.md  the text shown on the project's start screen
+    set-project --project NAME [--target N] [--calibration N] [--training-required 0|1]   (also in the dashboard)
+    add-items --project NAME --items path.json     append pool items to an existing project (seq continues)
     sync-exports --out-dir DIR                      export every project (annotations + training answers) as CSV
     status [--project NAME]                         coverage per project, per-coder counts and time
     export --project NAME --out path.csv            one row per annotation (values flattened, hidden fields flattened)
@@ -242,6 +244,35 @@ def cmd_import_training(c: Client, a):
     print(f"added {len(rows)} training items to {p['name']} (seq {base}..{base + len(rows) - 1})")
 
 
+def cmd_set_project(c: Client, a):
+    p = _project(c, a.project)
+    body = {}
+    if a.target is not None:
+        body["target_coverage"] = a.target
+    if a.calibration is not None:
+        body["calibration_n"] = a.calibration
+    if a.training_required is not None:
+        body["training_required"] = bool(a.training_required)
+    if not body:
+        sys.exit("nothing to change")
+    c.update("projects", {"id": f"eq.{p['id']}"}, body)
+    print(f"{p['name']}: {body}")
+
+
+def cmd_add_items(c: Client, a):
+    p = _project(c, a.project)
+    spec = json.load(open(a.items, encoding="utf-8"))
+    items = spec["items"] if isinstance(spec, dict) else spec
+    existing = c.select("items", {"select": "seq", "project_id": f"eq.{p['id']}", "order": "seq.desc", "limit": "1"})
+    base = (existing[0]["seq"] + 1) if existing else 0
+    rows = [{"project_id": p["id"], "external_id": it["external_id"], "display": it["display"], "hidden": it.get("hidden"),
+             "is_gold": bool(it.get("is_gold", False)), "gold_values": it.get("gold_values"), "seq": base + i}
+            for i, it in enumerate(items)]
+    for s in range(0, len(rows), 500):
+        c.insert("items", rows[s:s + 500])
+    print(f"added {len(rows)} items to {p['name']} (seq {base}..{base + len(rows) - 1}); coders keep pulling from the enlarged pool")
+
+
 def cmd_set_instructions(c: Client, a):
     p = _project(c, a.project)
     c.update("projects", {"id": f"eq.{p['id']}"}, {"instructions_text": Path(a.file).read_text(encoding="utf-8")})
@@ -369,6 +400,9 @@ def main() -> None:
     s = sub.add_parser("reset-training"); s.add_argument("--email", required=True); s.add_argument("--project", required=True)
     s = sub.add_parser("import-training"); s.add_argument("--project", required=True); s.add_argument("--items", required=True); s.add_argument("--replace", action="store_true")
     s = sub.add_parser("set-instructions"); s.add_argument("--project", required=True); s.add_argument("--file", required=True)
+    s = sub.add_parser("set-project"); s.add_argument("--project", required=True); s.add_argument("--target", type=int, default=None)
+    s.add_argument("--calibration", type=int, default=None); s.add_argument("--training-required", type=int, default=None, choices=[0, 1])
+    s = sub.add_parser("add-items"); s.add_argument("--project", required=True); s.add_argument("--items", required=True)
     s = sub.add_parser("sync-exports"); s.add_argument("--out-dir", required=True)
     s = sub.add_parser("status"); s.add_argument("--project", default=None)
     s = sub.add_parser("export"); s.add_argument("--project", required=True); s.add_argument("--out", required=True)
@@ -381,7 +415,8 @@ def main() -> None:
      "status": cmd_status, "export": cmd_export, "close": lambda c, a: cmd_set_status(c, a, "closed"),
      "reopen": lambda c, a: cmd_set_status(c, a, "open"), "delete-project": cmd_delete_project, "invite": cmd_invite,
      "grant": cmd_grant, "revoke": cmd_revoke, "members": cmd_members, "reset-training": cmd_reset_training,
-     "import-training": cmd_import_training, "set-instructions": cmd_set_instructions, "sync-exports": cmd_sync_exports}[a.cmd](c, a)
+     "import-training": cmd_import_training, "set-instructions": cmd_set_instructions, "sync-exports": cmd_sync_exports,
+     "set-project": cmd_set_project, "add-items": cmd_add_items}[a.cmd](c, a)
 
 
 if __name__ == "__main__":
