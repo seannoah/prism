@@ -294,7 +294,7 @@ def cmd_status(c: Client, a):
             hist[done.get(i, 0)] = hist.get(done.get(i, 0), 0) + 1
         n_train = sum(1 for i in items if i.get("is_training"))
         members = c.select("project_members", {"select": "user_id,training_done_at", "project_id": f"eq.{p['id']}"})
-        print(f"\n{p['name']} [{p['status']}] items {len(ids) - n_train} (+{n_train} training), target {p['target_coverage']}, "
+        print(f"\n{p['name']} [{p['status']}] items {len(ids)} (+{n_train} training), target {p['target_coverage']}, "
               f"calibration {p['calibration_n']}, members {len(members)} ({sum(1 for m in members if m['training_done_at'])} trained)")
         print("  items by number of completed annotations: " + ", ".join(f"{k}: {v}" for k, v in sorted(hist.items())))
         sessions = [s for s in c.select("sessions", {"select": "coder_id,active_seconds,project_id"}) if s["project_id"] == p["id"]]
