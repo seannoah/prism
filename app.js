@@ -142,8 +142,16 @@
     if (state.tIndex < 0) return finishTraining();
     showTrainingItem();
   }
+  function wireToggle(btnId, boxId, label, text) {
+    const btn = $(btnId), box = $(boxId);
+    btn.hidden = !text;
+    box.innerHTML = md(text || "");
+    btn.onclick = () => { box.hidden = !box.hidden; btn.textContent = (box.hidden ? "Show " : "Hide ") + label; };
+  }
   function showTrainingItem() {
     const t = state.training[state.tIndex];
+    wireToggle("training-rubric-toggle", "training-rubric", "rubric", state.project.rubric_text);
+    wireToggle("training-instr-toggle", "training-instr", "instructions", state.project.instructions_text);
     $("training-label").textContent = `Training item ${state.tIndex + 1} of ${state.training.length} · ${state.project.name}`;
     $("training-text").textContent = t.display?.text || "";
     $("training-context").hidden = !t.display?.context; $("training-context").textContent = t.display?.context || "";
@@ -188,12 +196,11 @@
     const p = state.project;
     if (trainingPending(p)) { location.hash = `#start/${p.project_id}`; return; }
     $("work-project").textContent = p.name;
-    $("rubric").textContent = p.rubric_text || (p.rubric_url ? `Rubric: ${p.rubric_url}` : "");
-    $("rubric-toggle").hidden = !p.rubric_text && !p.rubric_url;
+    wireToggle("rubric-toggle", "rubric", "rubric", p.rubric_text || (p.rubric_url ? `Rubric: ${p.rubric_url}` : ""));
+    wireToggle("instr-toggle", "instr", "instructions", p.instructions_text);
     await startSession(p.project_id);
     await claimNext();
   }
-  $("rubric-toggle").addEventListener("click", () => { const r = $("rubric"); r.hidden = !r.hidden; $("rubric-toggle").textContent = r.hidden ? "Show rubric" : "Hide rubric"; });
   async function claimNext() {
     $("item").hidden = true; $("pool-empty").hidden = true; $("form-error").hidden = true;
     $("item-status").textContent = "Fetching the next item…";

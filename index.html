@@ -57,7 +57,9 @@
   </section>
 
   <section id="screen-training" class="screen" hidden>
-    <div class="toolbar"><span id="training-label" class="muted"></span><a href="#home" class="secondary-link">Projects</a></div>
+    <div class="toolbar"><span id="training-label" class="muted"></span><button id="training-rubric-toggle" class="link" hidden>Show rubric</button><button id="training-instr-toggle" class="link">Show instructions</button><a href="#home" class="secondary-link">Projects</a></div>
+    <div id="training-rubric" class="rubric" hidden></div>
+    <div id="training-instr" class="rubric" hidden></div>
     <article id="training-item">
       <div id="training-text" class="item-text"></div>
       <div id="training-context" class="context" hidden></div>
@@ -73,10 +75,12 @@
     <div class="toolbar">
       <span id="work-project" class="muted"></span>
       <button id="rubric-toggle" class="link" hidden>Show rubric</button>
+      <button id="instr-toggle" class="link">Show instructions</button>
       <a href="#home" class="secondary-link">Projects</a>
       <span id="timer" class="timer" title="active seconds on this item">0:00</span>
     </div>
     <div id="rubric" class="rubric" hidden></div>
+    <div id="instr" class="rubric" hidden></div>
     <div id="item-status" class="muted"></div>
     <article id="item" hidden>
       <div id="item-label" class="muted"></div>
