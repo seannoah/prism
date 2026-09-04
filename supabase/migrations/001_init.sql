@@ -56,12 +56,12 @@ create index if not exists assignments_item  on public.assignments (item_id, sta
 create table if not exists public.annotations (
   id             uuid primary key default gen_random_uuid(),
   assignment_id  uuid not null unique references public.assignments(id) on delete cascade,
-  values         jsonb not null,
+  answers        jsonb not null,             -- ('values' is reserved in some SQL contexts)
   confidence     int,
   notes          text,
   time_spent_s   int not null default 0,
   submitted_at   timestamptz not null default now(),
-  revised_values jsonb,
+  revised_answers jsonb,
   revised_at     timestamptz
 );
 
@@ -205,7 +205,7 @@ begin
   if v_status is null then raise exception 'not your assignment'; end if;
   if v_status <> 'claimed' then raise exception 'assignment already %', v_status; end if;
   if v_project_status <> 'open' then raise exception 'project is closed'; end if;
-  insert into public.annotations (assignment_id, values, confidence, notes, time_spent_s)
+  insert into public.annotations (assignment_id, answers, confidence, notes, time_spent_s)
        values (p_assignment, p_values, p_confidence, p_notes, greatest(coalesce(p_time_spent_s, 0), 0))
     returning id into v_id;
   update public.assignments set status = 'done' where id = p_assignment;
@@ -224,7 +224,7 @@ end $$;
 create or replace function public.revise_annotation(p_annotation uuid, p_values jsonb, p_confidence int, p_notes text)
 returns void language plpgsql security definer set search_path = public as $$
 begin
-  update public.annotations n set revised_values = p_values, revised_at = now(), confidence = p_confidence, notes = p_notes
+  update public.annotations n set revised_answers = p_values, revised_at = now(), confidence = p_confidence, notes = p_notes
     from public.assignments a join public.items i on i.id = a.item_id join public.projects p on p.id = i.project_id
    where n.id = p_annotation and n.assignment_id = a.id and a.coder_id = auth.uid() and p.status = 'open';
   if not found then raise exception 'not your annotation, or the project is closed'; end if;
@@ -262,10 +262,10 @@ language sql security definer set search_path = public stable as $$
 $$;
 
 create or replace function public.my_recent_annotations(p_project uuid, p_n int default 20)
-returns table (annotation_id uuid, external_id text, display jsonb, values jsonb, revised_values jsonb,
+returns table (annotation_id uuid, external_id text, display jsonb, answers jsonb, revised_answers jsonb,
                confidence int, notes text, submitted_at timestamptz, revised_at timestamptz)
 language sql security definer set search_path = public stable as $$
-  select n.id, i.external_id, i.display, n.values, n.revised_values, n.confidence, n.notes, n.submitted_at, n.revised_at
+  select n.id, i.external_id, i.display, n.answers, n.revised_answers, n.confidence, n.notes, n.submitted_at, n.revised_at
     from public.annotations n join public.assignments a on a.id = n.assignment_id join public.items i on i.id = a.item_id
    where a.coder_id = auth.uid() and i.project_id = p_project
    order by n.submitted_at desc

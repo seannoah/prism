@@ -216,7 +216,7 @@
     if (error) { box.innerHTML = `<p class="error">${esc(error.message)}</p>`; return; }
     if (!data?.length) { box.innerHTML = `<p class="muted">No answers in this project yet.</p>`; return; }
     box.innerHTML = data.map((a) => {
-      const v = a.revised_values || a.values;
+      const v = a.revised_answers || a.answers;
       return `<div class="revisit" data-id="${a.annotation_id}"><div><strong>${esc(a.external_id)}</strong> · ${new Date(a.submitted_at).toLocaleString()}${a.revised_at ? " · revised" : ""}</div>` +
         `<div class="snippet">${esc((a.display?.text || "").slice(0, 240))}${(a.display?.text || "").length > 240 ? "…" : ""}</div>` +
         `<div class="snippet">Answer: ${esc(JSON.stringify(v))}</div>` +
@@ -226,7 +226,7 @@
   }
   function openRevise(project, ann, holder) {
     holder.hidden = false;
-    const values = ann.revised_values || ann.values;
+    const values = ann.revised_answers || ann.answers;
     holder.innerHTML = `<form class="revise-form"></form><button class="save">Save revision</button> <button class="secondary cancel">Cancel</button><p class="error" hidden></p>`;
     const form = holder.querySelector("form");
     const saved = state.spec; const prevForm = $("annotation-form");
