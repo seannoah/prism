@@ -3,7 +3,8 @@
 Security test: log in as a coder (publishable key + email/password) and verify that row-level security hides what it
 must hide. Needs two coder accounts created with `prism_admin.py create-coder` and, in .env:
     SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, TEST_CODER1_EMAIL, TEST_CODER1_PASSWORD, TEST_CODER2_EMAIL, TEST_CODER2_PASSWORD
-and at least one open project with items. Standard library only.  Exit 1 on any failure.
+and at least one open project with items; coder 1 must be a member of it (v1.1 roster), coder 2 should NOT be (to test the
+membership check). Standard library only.  Exit 1 on any failure.
 """
 from __future__ import annotations
 
@@ -70,6 +71,19 @@ def main() -> None:
     items = c1.get("items", {"select": "id,hidden", "limit": "5"})
     check("coder CANNOT read items (hidden) directly", items == [] or (isinstance(items, dict) and items.get("_http") in (401, 403)), str(items)[:120])
 
+    # v1.1: membership + training gate.  A non-member must be refused; then complete the training items (if any).
+    outsider = c2.rpc("claim_next_item", {"p_project": pid})
+    members = c2.get("project_members", {"select": "project_id"})
+    if isinstance(members, list) and not any(m["project_id"] == pid for m in members):
+        check("non-member CANNOT claim", isinstance(outsider, dict) and outsider.get("_http") in (400, 401, 403), str(outsider)[:120])
+    tr = c1.rpc("training_items", {"p_project": pid})
+    if isinstance(tr, list) and tr:
+        for it in tr:
+            if not it.get("answered"):
+                res = c1.rpc("training_check", {"p_item": it["item_id"], "p_values": {"is_synesthesia": "U"}})
+                check(f"training feedback for {it['external_id']} hides nothing but the key", isinstance(res, list) and "gold_values" in res[0], str(res)[:100])
+        done = c1.rpc("training_complete", {"p_project": pid})
+        check("training_complete accepted", isinstance(done, str), str(done)[:80])
     claim = c1.rpc("claim_next_item", {"p_project": pid})
     row = claim[0] if isinstance(claim, list) and claim else None
     check("coder can claim an item through the function", row is not None and "display" in row and "hidden" not in row, str(claim)[:160])

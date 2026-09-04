@@ -8,9 +8,9 @@
 </head>
 <body>
 <header>
-  <div class="brand">PRISM <span class="sub">Psychopharmacology Research Intern Scoring &amp; Measurement Portal</span></div>
+  <div class="brand"><a href="#home" class="brand-link">PRISM</a> <span class="sub">Psychopharmacology Research Intern Scoring &amp; Measurement Portal</span></div>
   <nav id="nav" hidden>
-    <a href="#work">Work</a>
+    <a href="#home">Projects</a>
     <a href="#progress">Progress</a>
     <a href="#admin" id="nav-admin" hidden>Admin</a>
     <span id="who"></span>
@@ -24,15 +24,56 @@
       <label>Email <input type="email" id="login-email" autocomplete="username" required></label>
       <label>Password <input type="password" id="login-password" autocomplete="current-password" required></label>
       <button type="submit">Sign in</button>
-      <p class="muted">Accounts are created by the lab; there is no self-registration.</p>
+      <p class="muted">Accounts are created by the lab (you receive an invitation e-mail). <button type="button" id="forgot" class="link">Forgot your password?</button></p>
       <p id="login-error" class="error" hidden></p>
+      <p id="login-info" class="muted" hidden></p>
     </form>
+  </section>
+
+  <section id="screen-setpw" class="screen" hidden>
+    <h1>Choose your password</h1>
+    <form id="setpw-form">
+      <label>New password (at least 8 characters) <input type="password" id="setpw-1" autocomplete="new-password" minlength="8" required></label>
+      <label>Repeat it <input type="password" id="setpw-2" autocomplete="new-password" minlength="8" required></label>
+      <button type="submit">Save password</button>
+      <p id="setpw-error" class="error" hidden></p>
+    </form>
+  </section>
+
+  <section id="screen-home" class="screen" hidden>
+    <h1>Your projects</h1>
+    <div id="project-cards"></div>
+  </section>
+
+  <section id="screen-start" class="screen" hidden>
+    <h1 id="start-title"></h1>
+    <p id="start-summary" class="muted"></p>
+    <div id="start-instructions" class="instructions"></div>
+    <div class="actions">
+      <button id="start-training" hidden>Begin the training items</button>
+      <button id="start-coding" hidden>Start coding</button>
+      <a href="#home" class="secondary-link">Back to projects</a>
+    </div>
+  </section>
+
+  <section id="screen-training" class="screen" hidden>
+    <div class="toolbar"><span id="training-label" class="muted"></span><a href="#home" class="secondary-link">Projects</a></div>
+    <article id="training-item">
+      <div id="training-text" class="item-text"></div>
+      <div id="training-context" class="context" hidden></div>
+      <form id="training-form"></form>
+      <div class="actions"><button id="training-check">Check my answer</button></div>
+      <div id="training-feedback" class="feedback" hidden></div>
+      <div class="actions"><button id="training-next" hidden>Next</button></div>
+      <p id="training-error" class="error" hidden></p>
+    </article>
   </section>
 
   <section id="screen-work" class="screen" hidden>
     <div class="toolbar">
-      <label>Project <select id="project-select"></select></label>
+      <span id="work-project" class="muted"></span>
       <button id="rubric-toggle" class="link" hidden>Show rubric</button>
+      <a href="#home" class="secondary-link">Projects</a>
       <span id="timer" class="timer" title="active seconds on this item">0:00</span>
     </div>
     <div id="rubric" class="rubric" hidden></div>
@@ -61,8 +102,8 @@
 
   <section id="screen-admin" class="screen" hidden>
     <h1>Projects</h1>
-    <table id="admin-table"><thead><tr><th>Project</th><th>Status</th><th>Items</th><th>Target</th><th>Calibration</th><th>Done</th><th>Skipped</th><th>Open claims</th><th>Items at target</th><th>Coders</th></tr></thead><tbody></tbody></table>
-    <p class="muted">Import, coder accounts and exports run from <code>admin/prism_admin.py</code> with the secret key.</p>
+    <table id="admin-table"><thead><tr><th>Project</th><th>Status</th><th>Items</th><th>Target</th><th>Calibration</th><th>Done</th><th>Skipped</th><th>Open claims</th><th>Items at target</th><th>Coders</th><th>Members</th><th>Trained</th></tr></thead><tbody></tbody></table>
+    <p class="muted">Invitations, grants, imports and exports run from <code>admin/prism_admin.py</code> with the secret key (see the PRISM CLAUDE.md playbook).</p>
   </section>
 </main>
 <footer class="muted">No model labels are ever shown to coders. Your item and session times are recorded automatically.</footer>

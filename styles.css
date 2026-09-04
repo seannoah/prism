@@ -32,3 +32,12 @@ th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--lin
 .revisit { border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; margin: 10px 0; background: var(--card); }
 .revisit .snippet { color: var(--muted); font-size: 14px; }
 footer { text-align: center; padding: 20px; }
+.brand-link { color: inherit; text-decoration: none; }
+.secondary-link { color: var(--accent); text-decoration: none; margin-left: auto; font-size: 14px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 18px; margin: 10px 0; display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+.card h3 { margin: 0 0 4px; font-size: 17px; } .card .meta { color: var(--muted); font-size: 14px; }
+.instructions { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 16px 20px; margin: 12px 0 16px; white-space: pre-wrap; font-size: 15px; line-height: 1.55; max-height: 60vh; overflow: auto; }
+.instructions h2 { font-size: 16px; margin: 14px 0 4px; }
+.feedback { background: #eef5ff; border: 1px solid #cfe0fb; border-radius: 8px; padding: 12px 14px; margin: 12px 0; white-space: pre-wrap; }
+.feedback.miss { background: #fff4ee; border-color: #f4cdb8; }
+article#training-item { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; }

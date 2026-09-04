@@ -12,8 +12,16 @@ Commands
     list-coders
     set-password --email a@b.edu [--password ...]    new password (printed if generated)
     deactivate --email a@b.edu                      keeps the annotations, blocks login
-    import --items path.json [--calibration-n N] [--rubric-text path.md] [--replace]
+    import --items path.json [--calibration-n N] [--rubric-text path.md] [--instructions-text path.md] [--replace]
                                                     create a project + its items from the stage-10 JSON
+    invite --email a@b.edu --name "Ada" [--projects syn-A,syn-BC]   send a Supabase invite e-mail (the RA sets their own
+                                                    password on the site) + profile + project grants
+    grant --email a@b.edu --projects syn-A,syn-BC   / revoke --email ... --projects ...
+    members --project NAME                          roster with training status
+    reset-training --email a@b.edu --project NAME   let a coder redo the training
+    import-training --project NAME --items training.json [--replace]   training items (gold answers + explanations)
+    set-instructions --project NAME --file path.md  the text shown on the project's start screen
+    sync-exports --out-dir DIR                      export every project (annotations + training answers) as CSV
     status [--project NAME]                         coverage per project, per-coder counts and time
     export --project NAME --out path.csv            one row per annotation (values flattened, hidden fields flattened)
     close --project NAME / reopen --project NAME
@@ -96,6 +104,10 @@ class Client:
     def set_password(self, user_id: str, password: str):
         return self._req("PUT", f"/auth/v1/admin/users/{user_id}", body={"password": password})
 
+    def invite_user(self, email: str, name: str, redirect_to: str | None = None):
+        path = "/auth/v1/invite" + (f"?redirect_to={urllib.parse.quote(redirect_to, safe='')}" if redirect_to else "")
+        return self._req("POST", path, body={"email": email, "data": {"display_name": name}})
+
     def list_users(self):
         out = self._req("GET", "/auth/v1/admin/users", params={"per_page": 1000})
         return out.get("users", out) if isinstance(out, dict) else out
@@ -136,13 +148,16 @@ def cmd_import(c: Client, a):
         proj["calibration_n"] = a.calibration_n
     if a.rubric_text:
         proj["rubric_text"] = Path(a.rubric_text).read_text(encoding="utf-8")
+    if a.instructions_text:
+        proj["instructions_text"] = Path(a.instructions_text).read_text(encoding="utf-8")
     existing = c.select("projects", {"select": "id,name", "name": f"eq.{proj['name']}"})
     if existing:
         if not a.replace:
             sys.exit(f"project {proj['name']} exists (id {existing[0]['id']}); use --replace to delete and re-import")
         c.delete("projects", {"id": f"eq.{existing[0]['id']}"})
         print(f"deleted existing project {proj['name']}")
-    keep = {k: proj[k] for k in ("name", "description", "rubric_url", "rubric_text", "form_spec", "target_coverage", "calibration_n") if k in proj}
+    keep = {k: proj[k] for k in ("name", "description", "rubric_url", "rubric_text", "instructions_text", "form_spec",
+                                 "target_coverage", "calibration_n") if k in proj}
     created = c.insert("projects", [keep])[0]
     pid = created["id"]
     items = spec["items"]
@@ -153,6 +168,105 @@ def cmd_import(c: Client, a):
         c.insert("items", rows[s:s + 500])
     print(f"imported project {proj['name']} (id {pid}): {len(rows)} items, target coverage {keep.get('target_coverage', 2)}, "
           f"calibration_n {keep.get('calibration_n', 0)}")
+
+
+APP_URL = "https://seannoah.github.io/prism/"
+
+
+def _profile(c: Client, email: str) -> dict:
+    prof = c.select("profiles", {"select": "user_id,display_name,email", "email": f"eq.{email}"})
+    if not prof:
+        sys.exit(f"no profile with email {email}")
+    return prof[0]
+
+
+def _grant(c: Client, user_id: str, names: list[str]) -> None:
+    for name in names:
+        p = _project(c, name)
+        c.insert("project_members", [{"project_id": p["id"], "user_id": user_id}], upsert=True)
+        print(f"  granted {name}")
+
+
+def cmd_invite(c: Client, a):
+    user = c.invite_user(a.email, a.name, redirect_to=APP_URL)
+    uid = user["id"]
+    c.insert("profiles", [{"user_id": uid, "display_name": a.name, "email": a.email, "role": a.role, "active": True}], upsert=True)
+    print(f"invited {a.role} {a.name} <{a.email}> user_id {uid}; they set their password from the e-mail link")
+    if a.projects:
+        _grant(c, uid, [x.strip() for x in a.projects.split(",") if x.strip()])
+
+
+def cmd_grant(c: Client, a):
+    prof = _profile(c, a.email)
+    print(f"{prof['display_name']} <{a.email}>:")
+    _grant(c, prof["user_id"], [x.strip() for x in a.projects.split(",") if x.strip()])
+
+
+def cmd_revoke(c: Client, a):
+    prof = _profile(c, a.email)
+    for name in [x.strip() for x in a.projects.split(",") if x.strip()]:
+        p = _project(c, name)
+        r = c.delete("project_members", {"project_id": f"eq.{p['id']}", "user_id": f"eq.{prof['user_id']}"})
+        print(f"  revoked {name} ({len(r)} row)")
+
+
+def cmd_members(c: Client, a):
+    p = _project(c, a.project)
+    profiles = {x["user_id"]: x for x in c.select("profiles", {"select": "user_id,display_name,email,active"})}
+    for m in c.select("project_members", {"select": "user_id,granted_at,training_done_at", "project_id": f"eq.{p['id']}", "order": "granted_at"}):
+        pr = profiles.get(m["user_id"], {})
+        print(f"  {pr.get('display_name', '?'):24s} {pr.get('email', ''):32s} granted {m['granted_at'][:10]}  "
+              f"training {'done ' + m['training_done_at'][:10] if m['training_done_at'] else 'pending'}")
+
+
+def cmd_reset_training(c: Client, a):
+    prof = _profile(c, a.email)
+    p = _project(c, a.project)
+    c.delete("training_answers", {"project_id": f"eq.{p['id']}", "user_id": f"eq.{prof['user_id']}"})
+    c.update("project_members", {"project_id": f"eq.{p['id']}", "user_id": f"eq.{prof['user_id']}"}, {"training_done_at": None})
+    print(f"training reset for {prof['display_name']} in {p['name']}")
+
+
+def cmd_import_training(c: Client, a):
+    p = _project(c, a.project)
+    spec = json.load(open(a.items, encoding="utf-8"))
+    items = spec["items"] if isinstance(spec, dict) else spec
+    if a.replace:
+        c.delete("items", {"project_id": f"eq.{p['id']}", "is_training": "eq.true"})
+    existing = c.select("items", {"select": "seq", "project_id": f"eq.{p['id']}", "order": "seq.desc", "limit": "1"})
+    base = (existing[0]["seq"] + 1) if existing else 0
+    rows = [{"project_id": p["id"], "external_id": it["external_id"], "display": it["display"], "hidden": it.get("hidden"),
+             "is_training": True, "gold_values": it.get("gold_values"), "explanation": it.get("explanation"),
+             "seq": base + i} for i, it in enumerate(items)]
+    c.insert("items", rows)
+    print(f"added {len(rows)} training items to {p['name']} (seq {base}..{base + len(rows) - 1})")
+
+
+def cmd_set_instructions(c: Client, a):
+    p = _project(c, a.project)
+    c.update("projects", {"id": f"eq.{p['id']}"}, {"instructions_text": Path(a.file).read_text(encoding="utf-8")})
+    print(f"instructions set for {p['name']} ({len(Path(a.file).read_text(encoding='utf-8'))} chars)")
+
+
+def cmd_sync_exports(c: Client, a):
+    out_dir = Path(a.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for p in c.select("projects", {"select": "id,name", "order": "created_at"}):
+        class A:
+            project = p["name"]
+            out = str(out_dir / f"prism_export_{p['name']}.csv")
+        cmd_export(c, A)
+        profiles = {x["user_id"]: x for x in c.select("profiles", {"select": "user_id,display_name,email"})}
+        items = {i["id"]: i for i in c.select("items", {"select": "id,external_id", "project_id": f"eq.{p['id']}"})}
+        tr = c.select("training_answers", {"select": "user_id,item_id,answers,matches_key,answered_at", "project_id": f"eq.{p['id']}", "order": "answered_at"})
+        with open(out_dir / f"prism_training_{p['name']}.csv", "w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(["project", "coder", "coder_email", "external_id", "answers_json", "matches_key", "answered_at"])
+            for x in tr:
+                w.writerow([p["name"], profiles.get(x["user_id"], {}).get("display_name"), profiles.get(x["user_id"], {}).get("email"),
+                            items.get(x["item_id"], {}).get("external_id"), json.dumps(x["answers"]), x["matches_key"], x["answered_at"]])
+        tpath = out_dir / f"prism_training_{p['name']}.csv"
+        print(f"wrote {tpath} ({len(tr)} training answers)")
 
 
 def _project(c: Client, name: str) -> dict:
@@ -168,7 +282,7 @@ def cmd_status(c: Client, a):
         projects = [p for p in projects if p["name"] == a.project]
     profiles = {p["user_id"]: p for p in c.select("profiles", {"select": "user_id,display_name,email"})}
     for p in projects:
-        items = c.select("items", {"select": "id,seq", "project_id": f"eq.{p['id']}"})
+        items = c.select("items", {"select": "id,seq,is_training", "project_id": f"eq.{p['id']}"})
         ids = {i["id"] for i in items}
         assigns = [x for x in c.select("assignments", {"select": "item_id,coder_id,status,claimed_at,expires_at"}) if x["item_id"] in ids]
         done = {}
@@ -178,7 +292,10 @@ def cmd_status(c: Client, a):
         hist = {}
         for i in ids:
             hist[done.get(i, 0)] = hist.get(done.get(i, 0), 0) + 1
-        print(f"\n{p['name']} [{p['status']}] items {len(ids)}, target {p['target_coverage']}, calibration {p['calibration_n']}")
+        n_train = sum(1 for i in items if i.get("is_training"))
+        members = c.select("project_members", {"select": "user_id,training_done_at", "project_id": f"eq.{p['id']}"})
+        print(f"\n{p['name']} [{p['status']}] items {len(ids) - n_train} (+{n_train} training), target {p['target_coverage']}, "
+              f"calibration {p['calibration_n']}, members {len(members)} ({sum(1 for m in members if m['training_done_at'])} trained)")
         print("  items by number of completed annotations: " + ", ".join(f"{k}: {v}" for k, v in sorted(hist.items())))
         sessions = [s for s in c.select("sessions", {"select": "coder_id,active_seconds,project_id"}) if s["project_id"] == p["id"]]
         for uid, prof in profiles.items():
@@ -191,7 +308,7 @@ def cmd_status(c: Client, a):
 
 def cmd_export(c: Client, a):
     p = _project(c, a.project)
-    items = {i["id"]: i for i in c.select("items", {"select": "id,external_id,seq,display,hidden,is_gold", "project_id": f"eq.{p['id']}"})}
+    items = {i["id"]: i for i in c.select("items", {"select": "id,external_id,seq,display,hidden,is_gold", "project_id": f"eq.{p['id']}", "is_training": "eq.false"})}
     profiles = {x["user_id"]: x for x in c.select("profiles", {"select": "user_id,display_name,email"})}
     assigns = {x["id"]: x for x in c.select("assignments", {"select": "id,item_id,coder_id,status,claimed_at,expires_at,skip_reason"}) if x["item_id"] in items}
     anns = [n for n in c.select("annotations", {"select": "*"}) if n["assignment_id"] in assigns]
@@ -243,7 +360,16 @@ def main() -> None:
     s = sub.add_parser("set-password"); s.add_argument("--email", required=True); s.add_argument("--password", default=None)
     s = sub.add_parser("deactivate"); s.add_argument("--email", required=True)
     s = sub.add_parser("import"); s.add_argument("--items", required=True); s.add_argument("--calibration-n", type=int, default=None)
-    s.add_argument("--rubric-text", default=None); s.add_argument("--replace", action="store_true")
+    s.add_argument("--rubric-text", default=None); s.add_argument("--instructions-text", default=None); s.add_argument("--replace", action="store_true")
+    s = sub.add_parser("invite"); s.add_argument("--email", required=True); s.add_argument("--name", required=True)
+    s.add_argument("--role", default="coder", choices=["coder", "admin"]); s.add_argument("--projects", default="")
+    s = sub.add_parser("grant"); s.add_argument("--email", required=True); s.add_argument("--projects", required=True)
+    s = sub.add_parser("revoke"); s.add_argument("--email", required=True); s.add_argument("--projects", required=True)
+    s = sub.add_parser("members"); s.add_argument("--project", required=True)
+    s = sub.add_parser("reset-training"); s.add_argument("--email", required=True); s.add_argument("--project", required=True)
+    s = sub.add_parser("import-training"); s.add_argument("--project", required=True); s.add_argument("--items", required=True); s.add_argument("--replace", action="store_true")
+    s = sub.add_parser("set-instructions"); s.add_argument("--project", required=True); s.add_argument("--file", required=True)
+    s = sub.add_parser("sync-exports"); s.add_argument("--out-dir", required=True)
     s = sub.add_parser("status"); s.add_argument("--project", default=None)
     s = sub.add_parser("export"); s.add_argument("--project", required=True); s.add_argument("--out", required=True)
     s = sub.add_parser("close"); s.add_argument("--project", required=True)
@@ -253,7 +379,9 @@ def main() -> None:
     c = Client(load_env())
     {"create-coder": cmd_create_coder, "list-coders": cmd_list_coders, "set-password": cmd_set_password, "deactivate": cmd_deactivate, "import": cmd_import,
      "status": cmd_status, "export": cmd_export, "close": lambda c, a: cmd_set_status(c, a, "closed"),
-     "reopen": lambda c, a: cmd_set_status(c, a, "open"), "delete-project": cmd_delete_project}[a.cmd](c, a)
+     "reopen": lambda c, a: cmd_set_status(c, a, "open"), "delete-project": cmd_delete_project, "invite": cmd_invite,
+     "grant": cmd_grant, "revoke": cmd_revoke, "members": cmd_members, "reset-training": cmd_reset_training,
+     "import-training": cmd_import_training, "set-instructions": cmd_set_instructions, "sync-exports": cmd_sync_exports}[a.cmd](c, a)
 
 
 if __name__ == "__main__":
