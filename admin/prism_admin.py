@@ -195,12 +195,12 @@ def cmd_export(c: Client, a):
             it = items[asg["item_id"]]
             prof = profiles.get(asg["coder_id"], {})
             n = next((x for x in anns if x["assignment_id"] == asg["id"]), None)
-            vals = (n or {}).get("revised_values") or (n or {}).get("values") or {}
+            vals = (n or {}).get("revised_answers") or (n or {}).get("answers") or {}
             if asg["status"] == "claimed":
                 continue
             w.writerow([p["name"], it["external_id"], it["seq"], prof.get("display_name"), prof.get("email"), asg["status"], asg["claimed_at"],
                         (n or {}).get("submitted_at"), (n or {}).get("time_spent_s"), (n or {}).get("confidence"),
-                        (n or {}).get("notes") if n else asg.get("skip_reason"), json.dumps((n or {}).get("values")), json.dumps((n or {}).get("revised_values")),
+                        (n or {}).get("notes") if n else asg.get("skip_reason"), json.dumps((n or {}).get("answers")), json.dumps((n or {}).get("revised_answers")),
                         (n or {}).get("revised_at")] + [json.dumps(vals.get(k)) if isinstance(vals.get(k), (list, dict)) else vals.get(k) for k in keys]
                        + [(it.get("hidden") or {}).get(k) for k in hidden_keys])
             rows += 1

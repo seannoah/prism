@@ -3,7 +3,7 @@
 A minimal coding portal for research assistants: coders log in, pull the next item that still needs a rating, code it
 on a form generated from a JSON spec, and their time is recorded automatically. A static single-page app on GitHub
 Pages (this repository) talks directly to a Supabase project (auth + Postgres + row-level security). No server to run.
-Specification: `docs/SPEC.md`.
+Specification: `docs/SPEC.md` (one deviation: the annotation columns are named `answers` / `revised_answers`, because `values` is reserved in Postgres function signatures).
 
 App: https://seannoah.github.io/prism/
 
