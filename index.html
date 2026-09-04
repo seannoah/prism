@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PRISM</title>
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=1.2.1">
 </head>
 <body>
 <header>
@@ -20,7 +20,7 @@
 <main>
   <section id="screen-login" class="screen">
     <h1>Sign in</h1>
-    <form id="login-form">
+    <form id="login-form" class="auth-form">
       <label>Email <input type="email" id="login-email" autocomplete="username" required></label>
       <label>Password <input type="password" id="login-password" autocomplete="current-password" required></label>
       <button type="submit">Sign in</button>
@@ -32,7 +32,7 @@
 
   <section id="screen-setpw" class="screen" hidden>
     <h1>Choose your password</h1>
-    <form id="setpw-form">
+    <form id="setpw-form" class="auth-form">
       <label>New password (at least 8 characters) <input type="password" id="setpw-1" autocomplete="new-password" minlength="8" required></label>
       <label>Repeat it <input type="password" id="setpw-2" autocomplete="new-password" minlength="8" required></label>
       <button type="submit">Save password</button>
@@ -120,7 +120,7 @@
 </main>
 <footer></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="config.js"></script>
-<script src="app.js"></script>
+<script src="config.js?v=1.2.1"></script>
+<script src="app.js?v=1.2.1"></script>
 </body>
 </html>

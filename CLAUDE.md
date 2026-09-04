@@ -16,6 +16,11 @@ into the right commands. Run everything from this folder; `admin/prism_admin.py`
    (a Claude session cannot run SQL there). Say exactly which file to paste.
 5. `import --replace` and `delete-project` destroy annotations: confirm with Sean first.
 
+## Deploying a change
+Bump the version string in `index.html` (the `?v=` on styles.css, config.js and app.js) with every push that touches
+those files; browsers cache them aggressively and a stale `app.js` under a new `index.html` breaks the page (seen
+2026-09-04). A hard reload (Cmd-Shift-R) is the user-side fix for an already-cached copy.
+
 ## Where things are
 - `index.html`, `app.js`, `styles.css`, `config.js`: the app (no build step; push to `main` deploys it).
 - `supabase/migrations/001_init.sql`, `002_roster_training.sql`: schema, row-level security, functions.
