@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PRISM</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <div class="brand">PRISM <span class="sub">Psychopharmacology Research Intern Scoring &amp; Measurement Portal</span></div>
+  <nav id="nav" hidden>
+    <a href="#work">Work</a>
+    <a href="#progress">Progress</a>
+    <a href="#admin" id="nav-admin" hidden>Admin</a>
+    <span id="who"></span>
+    <button id="logout" class="link">Sign out</button>
+  </nav>
+</header>
+<main>
+  <section id="screen-login" class="screen">
+    <h1>Sign in</h1>
+    <form id="login-form">
+      <label>Email <input type="email" id="login-email" autocomplete="username" required></label>
+      <label>Password <input type="password" id="login-password" autocomplete="current-password" required></label>
+      <button type="submit">Sign in</button>
+      <p class="muted">Accounts are created by the lab; there is no self-registration.</p>
+      <p id="login-error" class="error" hidden></p>
+    </form>
+  </section>
+
+  <section id="screen-work" class="screen" hidden>
+    <div class="toolbar">
+      <label>Project <select id="project-select"></select></label>
+      <button id="rubric-toggle" class="link" hidden>Show rubric</button>
+      <span id="timer" class="timer" title="active seconds on this item">0:00</span>
+    </div>
+    <div id="rubric" class="rubric" hidden></div>
+    <div id="item-status" class="muted"></div>
+    <article id="item" hidden>
+      <div id="item-label" class="muted"></div>
+      <div id="item-text" class="item-text"></div>
+      <div id="item-context" class="context" hidden></div>
+      <form id="annotation-form"></form>
+      <div class="actions">
+        <button id="skip" class="secondary">Skip…</button>
+        <button id="submit">Submit and next</button>
+      </div>
+      <p id="form-error" class="error" hidden></p>
+    </article>
+    <div id="pool-empty" class="notice" hidden>Nothing left for you in this project right now. Thank you!</div>
+  </section>
+
+  <section id="screen-progress" class="screen" hidden>
+    <h1>Your progress</h1>
+    <table id="progress-table"><thead><tr><th>Project</th><th>Status</th><th>Done</th><th>Skipped</th><th>Active time</th><th>Items in pool</th></tr></thead><tbody></tbody></table>
+    <h2>Revisit your last answers</h2>
+    <label>Project <select id="revisit-project"></select></label>
+    <div id="revisit-list"></div>
+  </section>
+
+  <section id="screen-admin" class="screen" hidden>
+    <h1>Projects</h1>
+    <table id="admin-table"><thead><tr><th>Project</th><th>Status</th><th>Items</th><th>Target</th><th>Calibration</th><th>Done</th><th>Skipped</th><th>Open claims</th><th>Items at target</th><th>Coders</th></tr></thead><tbody></tbody></table>
+    <p class="muted">Import, coder accounts and exports run from <code>admin/prism_admin.py</code> with the secret key.</p>
+  </section>
+</main>
+<footer class="muted">No model labels are ever shown to coders. Your item and session times are recorded automatically.</footer>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

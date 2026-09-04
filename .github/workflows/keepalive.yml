@@ -1,0 +1,14 @@
+name: keep the Supabase project awake
+on:
+  schedule:
+    - cron: "17 9 * * 1,4"   # Mondays and Thursdays 09:17 UTC (free projects pause after 7 idle days)
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: touch the database through the API
+        run: |
+          curl -fsS -H "apikey: sb_publishable_HRoCIZtfsY4m0E8HCMc9HA_BpNZVMuC" \
+               -H "Authorization: Bearer sb_publishable_HRoCIZtfsY4m0E8HCMc9HA_BpNZVMuC" \
+               "https://colimjlptydvfsgoikyw.supabase.co/rest/v1/ping?select=id" && echo " ok"
