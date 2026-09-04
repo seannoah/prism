@@ -188,6 +188,7 @@ language sql security definer set search_path = public stable as $$
    order by p.created_at;
 $$;
 
+drop function if exists public.admin_project_stats();   -- return columns changed: Postgres needs a drop first
 create or replace function public.admin_project_stats()
 returns table (project_id uuid, name text, status text, n_items bigint, target_coverage int, calibration_n int,
                n_done bigint, n_skipped bigint, n_open_claims bigint, items_at_target bigint, coders_active bigint,
