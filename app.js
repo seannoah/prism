@@ -107,7 +107,7 @@
     if (!state.projects.length) { box.innerHTML = `<p class="muted">No projects have been assigned to you yet.</p>`; return; }
     box.innerHTML = state.projects.map((p) => {
       const pend = trainingPending(p);
-      const meta = `${p.n_items} items · you: ${p.n_done} done, ${p.n_skipped} skipped, ${fmt(Number(p.active_seconds))} active` +
+      const meta = `${p.n_items} items in the shared pool, each rated by ${p.target_coverage} people · you: ${p.n_done} done, ${p.n_skipped} skipped, ${fmt(Number(p.active_seconds))} active` +
                    (Number(p.n_training) ? ` · training ${p.training_done_at ? "completed" : `${p.n_training_answered}/${p.n_training} done`}` : "") +
                    (p.status !== "open" ? " · closed" : "");
       const btn = p.status !== "open" ? `<a href="#progress" class="secondary-link">Review</a>`
@@ -120,9 +120,10 @@
   function loadStart() {
     const p = state.project;
     $("start-title").textContent = p.name;
-    $("start-summary").textContent = `${p.n_items} items in the pool, ${p.target_coverage} coders per item` +
-      (Number(p.calibration_n) ? `, the first ${p.calibration_n} are calibration items everyone codes` : "") +
-      (Number(p.n_training) ? `; ${p.n_training} training items with feedback come first.` : ".");
+    $("start-summary").textContent = `${p.n_items} items in a pool shared by all coders; each item is rated by ${p.target_coverage} people, ` +
+      `so you will see a share of them, handed out one at a time` +
+      (Number(p.calibration_n) ? `. The first ${p.calibration_n} (the calibration block) are the same for everyone` : "") +
+      (Number(p.n_training) ? `. ${p.n_training} training items with feedback come first.` : ".");
     $("start-instructions").innerHTML = md(p.instructions_text || p.rubric_text || "No instructions have been added to this project yet.");
     const pend = trainingPending(p);
     $("start-training").hidden = !pend;
