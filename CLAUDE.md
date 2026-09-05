@@ -48,7 +48,7 @@ those files; browsers cache them aggressively and a stale `app.js` under a new `
 | "how far along is coding?" | `status` (coverage histogram, per-coder counts and hours) |
 | "set up project X from the analysis" | `import --items ../Synesthesia/Results/validation/prism/<X>.json --calibration-n 20 --rubric-text ../Synesthesia/Docs/coding_rubric.md --instructions-text <md>`; then `import-training --project <name> --items <training.json>`; then grants |
 | "update the instructions for X" | edit the markdown, then `set-instructions --project <name> --file <md>` |
-| "pull the coding data into the analysis" | `sync-exports --out-dir ../Synesthesia/Results/validation/prism_exports` then commit in `../Synesthesia` and run `Analysis/11_validation_analysis.py` |
+| "pull the coding data into the analysis" | `sync-exports --out-dir ../Synesthesia/Results/validation/prism_exports` (with the Munki Python 3.12 prefix `SSL_CERT_FILE=$(python -m certifi)`; the exports stay untracked like KEY files), then `cd ../Synesthesia/Analysis && python 11_validation_analysis.py --prism-dir ../Results/validation/prism_exports` and commit its outputs (`Results/validation/summary.md`, `disagreements.csv`, `Results/tables/validation_metrics.json`) |
 | "close project X" / "reopen" | `close --project <name>` / `reopen --project <name>` (also a button in the dashboard) |
 | "raise the coverage of X to 3" / "make the first 30 items calibration" | `set-project --project <name> --target 3` / `--calibration 30` (also editable in the dashboard; takes effect on the next claim) |
 | "add these items to X" | `add-items --project <name> --items <json>` (pool grows; nothing else changes) |
