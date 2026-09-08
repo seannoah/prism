@@ -30,8 +30,19 @@ Sean's; the session's checks are the unauthenticated login page in the Browser p
   `syn-E-label-mapping` (545, coverage 1, calibration 0). Sean is a member of all four (preview); the test coders are
   members of none — keep it that way for real rounds (the security test re-grants its own dummy coder; re-import with
   `--replace` after running it). No RAs invited yet. The length question for syn-BC is settled (split, not capped).
+  2026-09-08 (later): Sean edited the rubric (`../Synesthesia/Docs/coding_rubric.md`), the onboarding primer and all
+  four instruction files; pushed with `set-rubric` and `set-instructions` to every project. He removed the FAQ sections,
+  so the instructions currently end at "Practicalities"; when calibration produces house rules, add a new FAQ section
+  at the end of the relevant `<name>-instructions.md` and `set-instructions` again (the closed-eye-visuals rule itself
+  lives in section 3 of the instructions, with examples, and in the rubric).
   Not yet built: a per-project RAs tab for many projects (v1.3), gold seeding in the pool, span and tag field types for
   the taxonomy projects, per-coder hour reports, custom SMTP for invitations.
+- 2026-09-08 15:45 (music study session): the three Erowid-music projects imported from `../Psychedelic_music/Results/validation/prism/`:
+  `mus-A-music-presence` (600 whole reports, coverage 2, calibration 20, 12 training items; rubric `../Psychedelic_music/Docs/coding_rubric_music.md`),
+  `mus-U1-unit-fidelity` (301 statements with their passages, calibration 15, 10 training items) and `mus-U2-passage-coverage`
+  (86 passages with their statements, calibration 15, 5 training items; both with rubric `../Psychedelic_music/Docs/coding_rubric_units.md`).
+  Sean is a member of all three (preview); no RAs invited. The music study's playbook is `../Psychedelic_music/CLAUDE.md`; its
+  exports will go to `../Psychedelic_music/Results/validation/prism_exports/` (stage 11 there).
 - Rolling calibration flow (no synchronous meeting) is the adopted process; see the section below.
 
 ## Hard rules
