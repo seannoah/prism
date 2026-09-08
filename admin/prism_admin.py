@@ -21,6 +21,9 @@ Commands
     reset-training --email a@b.edu --project NAME   let a coder redo the training
     import-training --project NAME --items training.json [--replace]   training items (gold answers + explanations)
     set-instructions --project NAME --file path.md  the text shown on the project's start screen
+    set-rubric --project NAME --file path.md        the rubric text (the "see rubric" panel)
+    set-form --project NAME --file spec.json        replace the form spec in place (add options/fields safely; removing or
+                                                    renaming a key orphans existing answers - re-import instead)
     set-project --project NAME [--target N] [--calibration N] [--training-required 0|1]   (also in the dashboard)
     add-items --project NAME --items path.json     append pool items to an existing project (seq continues)
     sync-exports --out-dir DIR                      export every project (annotations + training answers) as CSV
@@ -279,6 +282,31 @@ def cmd_set_instructions(c: Client, a):
     print(f"instructions set for {p['name']} ({len(Path(a.file).read_text(encoding='utf-8'))} chars)")
 
 
+def cmd_set_rubric(c: Client, a):
+    p = _project(c, a.project)
+    text = Path(a.file).read_text(encoding="utf-8")
+    c.update("projects", {"id": f"eq.{p['id']}"}, {"rubric_text": text})
+    print(f"rubric set for {p['name']} ({len(text)} chars)")
+
+
+def cmd_set_form(c: Client, a):
+    p = _project(c, a.project)
+    spec = json.load(open(a.file, encoding="utf-8"))
+    if isinstance(spec, dict) and "form_spec" in spec:          # a project JSON is accepted too
+        spec = spec["form_spec"]
+    if isinstance(spec, dict) and "project" in spec and "form_spec" in spec["project"]:
+        spec = spec["project"]["form_spec"]
+    if not isinstance(spec, list) or not all(isinstance(f, dict) and {"key", "label", "type"} <= set(f) for f in spec):
+        sys.exit("the spec must be a list of fields with key, label and type (as in the import JSON's form_spec)")
+    old_keys = [f["key"] for f in (p.get("form_spec") or [])]
+    new_keys = [f["key"] for f in spec]
+    dropped = [k for k in old_keys if k not in new_keys]
+    if dropped and not a.yes:
+        sys.exit(f"the new spec drops field(s) {dropped}: existing answers would keep orphaned values; add --yes to confirm")
+    c.update("projects", {"id": f"eq.{p['id']}"}, {"form_spec": spec})
+    print(f"form spec set for {p['name']}: {len(spec)} fields ({', '.join(new_keys)}); added {[k for k in new_keys if k not in old_keys]}, dropped {dropped}")
+
+
 def cmd_sync_exports(c: Client, a):
     out_dir = Path(a.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -400,6 +428,8 @@ def main() -> None:
     s = sub.add_parser("reset-training"); s.add_argument("--email", required=True); s.add_argument("--project", required=True)
     s = sub.add_parser("import-training"); s.add_argument("--project", required=True); s.add_argument("--items", required=True); s.add_argument("--replace", action="store_true")
     s = sub.add_parser("set-instructions"); s.add_argument("--project", required=True); s.add_argument("--file", required=True)
+    s = sub.add_parser("set-rubric"); s.add_argument("--project", required=True); s.add_argument("--file", required=True)
+    s = sub.add_parser("set-form"); s.add_argument("--project", required=True); s.add_argument("--file", required=True); s.add_argument("--yes", action="store_true")
     s = sub.add_parser("set-project"); s.add_argument("--project", required=True); s.add_argument("--target", type=int, default=None)
     s.add_argument("--calibration", type=int, default=None); s.add_argument("--training-required", type=int, default=None, choices=[0, 1])
     s = sub.add_parser("add-items"); s.add_argument("--project", required=True); s.add_argument("--items", required=True)
@@ -415,7 +445,7 @@ def main() -> None:
      "status": cmd_status, "export": cmd_export, "close": lambda c, a: cmd_set_status(c, a, "closed"),
      "reopen": lambda c, a: cmd_set_status(c, a, "open"), "delete-project": cmd_delete_project, "invite": cmd_invite,
      "grant": cmd_grant, "revoke": cmd_revoke, "members": cmd_members, "reset-training": cmd_reset_training,
-     "import-training": cmd_import_training, "set-instructions": cmd_set_instructions, "sync-exports": cmd_sync_exports,
+     "import-training": cmd_import_training, "set-instructions": cmd_set_instructions, "set-rubric": cmd_set_rubric, "set-form": cmd_set_form, "sync-exports": cmd_sync_exports,
      "set-project": cmd_set_project, "add-items": cmd_add_items}[a.cmd](c, a)
 
 

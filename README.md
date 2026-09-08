@@ -30,7 +30,8 @@ docs/SPEC.md                                the design document
 ## Daily use
 
 ```
-python3 admin/prism_admin.py create-coder --email ra@calpoly.edu --name "Ada"     # prints a temporary password
+python3 admin/prism_admin.py invite --email ra@calpoly.edu --name "Ada" --projects syn-A-passage-precision   # e-mails an invitation
+python3 admin/prism_admin.py create-coder --email ra@calpoly.edu --name "Ada"     # alternative: prints a temporary password
 python3 admin/prism_admin.py status                                               # coverage + per-coder time
 python3 admin/prism_admin.py export --project syn-A-passage-precision --out exports/syn-A.csv
 python3 admin/prism_admin.py close --project syn-A-passage-precision
