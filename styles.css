@@ -60,3 +60,18 @@ article#training-item { background: var(--card); border: 1px solid var(--line); 
 .auth-form label input { display: block; width: 100%; max-width: 380px; margin-top: 6px; font-weight: 400; }
 .auth-form button[type=submit] { margin-top: 18px; }
 .auth-form p { margin-top: 14px; }
+
+/* v1.2.4: two-pane coding layout. On the work and training screens the item text sits on the left with its own
+   scrollbar (sticky, at most one viewport tall) and the form on the right scrolls with the page, so a coder can keep
+   a long report in view while answering. Narrow windows fall back to the stacked layout. */
+main.wide { max-width: 1400px; }
+article.split { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 0 28px; align-items: start; }
+article.split .pane-text { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow: auto; padding-right: 20px; border-right: 1px solid var(--line); }
+article.split .pane-form fieldset:first-child { margin-top: 4px; }
+@media (max-width: 960px) {
+  article.split { display: block; }
+  article.split .pane-text { position: static; max-height: none; overflow: visible; padding-right: 0; border-right: none; margin-bottom: 14px; }
+}
+/* markdown renderer additions (### headings, `code`) */
+.instructions h3, .rubric h3 { font-size: 15px; margin: 12px 0 2px; }
+.instructions code, .rubric code, .feedback code { font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background: #f3f2ee; padding: 0 4px; border-radius: 4px; }

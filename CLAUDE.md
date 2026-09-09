@@ -43,6 +43,19 @@ Sean's; the session's checks are the unauthenticated login page in the Browser p
   (86 passages with their statements, calibration 15, 5 training items; both with rubric `../Psychedelic_music/Docs/coding_rubric_units.md`).
   Sean is a member of all three (preview); no RAs invited. The music study's playbook is `../Psychedelic_music/CLAUDE.md`; its
   exports will go to `../Psychedelic_music/Results/validation/prism_exports/` (stage 11 there).
+- 2026-09-08 (evening): v1.2.4 live: two-pane coding layout (work and training screens: item text on the left with its own
+  scrollbar, sticky at most one viewport tall; the form on the right scrolls with the page; stacked again under 960 px) and the
+  rubric retired as a separate coder-facing document. Every project shows one text, its instructions; `rubric_text`/`rubric_url`
+  are null on all nine projects (`set-rubric --clear`), and the "Show rubric" button only appears if a rubric is set again. ket-0
+  and mus-A had their rubrics merged into the instructions (ket-0 sections 4–6, mus-A sections 2–10; their form labels now cite
+  those sections, in the import JSONs and the builder scripts), mus-U1 gained the model's rules as its section 2, syn-A/BC/D
+  gained the three rules that only the rubric had (U under one in ten, both directions when unclear, labelled imagination is 0),
+  and the four rubric files carry a "no longer shown" note. The markdown renderer now also handles `###` headings and `code`.
+  The ketamine projects are live too: `ket-0-report-survey` (100 whole reports, coverage 2, calibration 10, 4 training items) and
+  `ket-R-sentence-recall` (100 reports as numbered sentences, coverage 2, calibration 10, 3 training items); sources in
+  `../Ketamine` (playbook `../Ketamine/CLAUDE.md`; neither `../Ketamine` nor `../Psychedelic_music` is a git repo, so their
+  edits are just files; `../Synesthesia` is, and its shared files were committed there). Sean is a member of all nine projects;
+  no RAs invited yet. The security test has not been run since the split layout (it codes one item; re-import after).
 - Rolling calibration flow (no synchronous meeting) is the adopted process; see the section below.
 
 ## Hard rules
@@ -62,7 +75,10 @@ those files; browsers cache them aggressively and a stale `app.js` under a new `
 2026-09-04). A hard reload (Cmd-Shift-R) is the user-side fix for an already-cached copy.
 
 ## Where things are
-- `index.html`, `app.js`, `styles.css`, `config.js`: the app (no build step; push to `main` deploys it).
+- `index.html`, `app.js`, `styles.css`, `config.js`: the app (no build step; push to `main` deploys it). `.claude/launch.json` (`preview_start` name
+  `prism-static`) serves a copy of the app from `/tmp/prism-preview` for layout checks, because the preview runner cannot read the Dropbox
+  folder: first `cp -R index.html app.js styles.css config.js assets /tmp/prism-preview/`. Only the login page is reachable without an
+  account, so mock the work screen from the console (unhide `#screen-work`, fill `#item-text` and `#annotation-form`) to see the layout.
 - `supabase/migrations/001_init.sql`, `002_roster_training.sql`: schema, row-level security, functions.
 - `supabase/migrations/003_admin_dashboard.sql`: the admin-only functions behind the dashboard.
 - `admin/prism_admin.py`: admin CLI (`python3 admin/prism_admin.py -h` lists every command). `tests/test_coder_permissions.py`:
@@ -78,9 +94,9 @@ those files; browsers cache them aggressively and a stale `app.js` under a new `
 | "who is on syn-A / have they done the training?" | `members --project syn-A-passage-precision` |
 | "Ada should redo the training" | `reset-training --email ... --project ...` |
 | "how far along is coding?" | `status` (coverage histogram, per-coder counts and hours) |
-| "set up project X from the analysis" | `import --items ../Synesthesia/Results/validation/prism/<X>.json --calibration-n 20 --rubric-text ../Synesthesia/Docs/coding_rubric.md --instructions-text <md>`; then `import-training --project <name> --items <training.json>`; then grants |
+| "set up project X from the analysis" | `import --items ../Synesthesia/Results/validation/prism/<X>.json --calibration-n 20 --instructions-text <md>` (one document per project: no `--rubric-text`); then `import-training --project <name> --items <training.json>`; then grants |
 | "update the instructions for X" | edit the markdown, then `set-instructions --project <name> --file <md>` |
-| "update the rubric" | edit `../Synesthesia/Docs/coding_rubric.md` (the analysis repo's file, which the analysis session should also commit), then `set-rubric --project <name> --file ...` for every project that shows it |
+| "update the rubric" | there is no separate rubric any more (retired 2026-09-08): each project shows one text, its instructions, so edit the project's instructions markdown and `set-instructions`. The analysis-side rubric files (`../Synesthesia/Docs/coding_rubric.md`, `../Ketamine/Docs/ket-0-rubric.md`, `../Psychedelic_music/Docs/coding_rubric_*.md`) are kept for the scripts that cite them and carry a note saying so; never `set-rubric --file` them back (that gives coders two overlapping documents). `set-rubric --clear` removes a rubric if one is ever set again |
 | "add an option / a field to the form of X" | edit the `form_spec` (in the project's import JSON, then commit it in `../Synesthesia`), then `set-form --project <name> --file <json>`; adding options or fields is safe for existing answers; dropping or renaming a key needs `--yes` and leaves orphaned values, so prefer a re-import if coding has not started |
 | "replace the training items of X" | `import-training --project <name> --items <training.json> --replace` (coders who already passed training keep their pass; `reset-training` if they should redo it) |
 | "pull the coding data into the analysis" | `sync-exports --out-dir ../Synesthesia/Results/validation/prism_exports` (with the Munki Python 3.12 prefix `SSL_CERT_FILE=$(python -m certifi)`; the exports stay untracked like KEY files), then `cd ../Synesthesia/Analysis && python 11_validation_analysis.py --prism-dir ../Results/validation/prism_exports` and commit its outputs (`Results/validation/summary.md`, `disagreements.csv`, `Results/tables/validation_metrics.json`) |
@@ -97,8 +113,9 @@ Project names are the `name` field of the import JSON (`syn-A-passage-precision`
 ## RA feedback and change requests: what each kind maps to
 - **Wording, examples, edge cases** ("the instructions don't say what to do when…"): add an FAQ line to the project's
   markdown in `../Synesthesia/Results/validation/prism/<name>-instructions.md` and `set-instructions`. Safe, immediate,
-  visible at the next item. Rubric-level changes (`../Synesthesia/Docs/coding_rubric.md` + `set-rubric` on every
-  project) are Sean's decision: they change the reference standard, so log them with the date in the FAQ.
+  visible at the next item. Definition-level changes (the shared sections 2–4 of the syn instructions, sections 4–5 of ket-0, 3–10 of mus-A, the
+  questions in mus-U1/U2) are Sean's decision: they change the reference standard, so log them with the date in the FAQ, and
+  mirror them into the analysis-side rubric file if a script cites it.
 - **A training item's key or explanation is wrong**: fix the training JSON, `import-training --replace`; or key the
   item in the Calibration tab if it is a calibration item.
 - **Form problems** (missing option, wants a free-text box): `set-form` (see the table). Removing options is the

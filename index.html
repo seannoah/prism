@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PRISM</title>
-<link rel="stylesheet" href="styles.css?v=1.2.3">
+<link rel="stylesheet" href="styles.css?v=1.2.4">
 </head>
 <body>
 <header>
@@ -60,14 +60,18 @@
     <div class="toolbar"><span id="training-label" class="muted"></span><button id="training-rubric-toggle" class="link" hidden>Show rubric</button><button id="training-instr-toggle" class="link">Show instructions</button><a href="#home" class="secondary-link">Projects</a></div>
     <div id="training-rubric" class="rubric" hidden></div>
     <div id="training-instr" class="rubric" hidden></div>
-    <article id="training-item">
-      <div id="training-text" class="item-text"></div>
-      <div id="training-context" class="context" hidden></div>
-      <form id="training-form"></form>
-      <div class="actions"><button id="training-check">Check my answer</button></div>
-      <div id="training-feedback" class="feedback" hidden></div>
-      <div class="actions"><button id="training-next" hidden>Next</button></div>
-      <p id="training-error" class="error" hidden></p>
+    <article id="training-item" class="split">
+      <div id="training-pane" class="pane pane-text">
+        <div id="training-text" class="item-text"></div>
+        <div id="training-context" class="context" hidden></div>
+      </div>
+      <div class="pane pane-form">
+        <form id="training-form"></form>
+        <div class="actions"><button id="training-check">Check my answer</button></div>
+        <div id="training-feedback" class="feedback" hidden></div>
+        <div class="actions"><button id="training-next" hidden>Next</button></div>
+        <p id="training-error" class="error" hidden></p>
+      </div>
     </article>
   </section>
 
@@ -82,16 +86,20 @@
     <div id="rubric" class="rubric" hidden></div>
     <div id="instr" class="rubric" hidden></div>
     <div id="item-status" class="muted"></div>
-    <article id="item" hidden>
-      <div id="item-label" class="muted"></div>
-      <div id="item-text" class="item-text"></div>
-      <div id="item-context" class="context" hidden></div>
-      <form id="annotation-form"></form>
-      <div class="actions">
-        <button id="skip" class="secondary">Skip…</button>
-        <button id="submit">Submit and next</button>
+    <article id="item" class="split" hidden>
+      <div id="item-pane" class="pane pane-text">
+        <div id="item-label" class="muted"></div>
+        <div id="item-text" class="item-text"></div>
+        <div id="item-context" class="context" hidden></div>
       </div>
-      <p id="form-error" class="error" hidden></p>
+      <div class="pane pane-form">
+        <form id="annotation-form"></form>
+        <div class="actions">
+          <button id="skip" class="secondary">Skip…</button>
+          <button id="submit">Submit and next</button>
+        </div>
+        <p id="form-error" class="error" hidden></p>
+      </div>
     </article>
     <div id="pool-empty" class="notice" hidden>Nothing left for you in this project right now. Thank you!</div>
   </section>
@@ -118,9 +126,9 @@
     <p class="muted">New RA accounts (invitations) and new projects or items are created from the command line, or by asking Claude with the PRISM playbook; everything else can be done here.</p>
   </section>
 </main>
-<footer class="muted small"><img class="cp-logo" src="assets/calpoly-logo.svg?v=1.2.3" alt="Cal Poly"><div>Psychopharmacology lab · PI: Dr. Sean Noah</div></footer>
+<footer class="muted small"><img class="cp-logo" src="assets/calpoly-logo.svg?v=1.2.4" alt="Cal Poly"><div>Psychopharmacology lab · PI: Dr. Sean Noah</div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="config.js?v=1.2.3"></script>
-<script src="app.js?v=1.2.3"></script>
+<script src="config.js?v=1.2.4"></script>
+<script src="app.js?v=1.2.4"></script>
 </body>
 </html>

@@ -21,7 +21,8 @@ Commands
     reset-training --email a@b.edu --project NAME   let a coder redo the training
     import-training --project NAME --items training.json [--replace]   training items (gold answers + explanations)
     set-instructions --project NAME --file path.md  the text shown on the project's start screen
-    set-rubric --project NAME --file path.md        the rubric text (the "see rubric" panel)
+    set-rubric --project NAME --file path.md | --clear   optional second document ("Show rubric" button); --clear removes it so the
+                                                    instructions are the only text coders see (lab policy since 2026-09-08)
     set-form --project NAME --file spec.json        replace the form spec in place (add options/fields safely; removing or
                                                     renaming a key orphans existing answers - re-import instead)
     set-project --project NAME [--target N] [--calibration N] [--training-required 0|1]   (also in the dashboard)
@@ -284,6 +285,12 @@ def cmd_set_instructions(c: Client, a):
 
 def cmd_set_rubric(c: Client, a):
     p = _project(c, a.project)
+    if a.clear:
+        c.update("projects", {"id": f"eq.{p['id']}"}, {"rubric_text": None, "rubric_url": None})
+        print(f"rubric cleared for {p['name']}: the instructions are now the only document coders see")
+        return
+    if not a.file:
+        sys.exit("give --file path.md, or --clear to remove the rubric")
     text = Path(a.file).read_text(encoding="utf-8")
     c.update("projects", {"id": f"eq.{p['id']}"}, {"rubric_text": text})
     print(f"rubric set for {p['name']} ({len(text)} chars)")
@@ -428,7 +435,7 @@ def main() -> None:
     s = sub.add_parser("reset-training"); s.add_argument("--email", required=True); s.add_argument("--project", required=True)
     s = sub.add_parser("import-training"); s.add_argument("--project", required=True); s.add_argument("--items", required=True); s.add_argument("--replace", action="store_true")
     s = sub.add_parser("set-instructions"); s.add_argument("--project", required=True); s.add_argument("--file", required=True)
-    s = sub.add_parser("set-rubric"); s.add_argument("--project", required=True); s.add_argument("--file", required=True)
+    s = sub.add_parser("set-rubric"); s.add_argument("--project", required=True); s.add_argument("--file", default=None); s.add_argument("--clear", action="store_true")
     s = sub.add_parser("set-form"); s.add_argument("--project", required=True); s.add_argument("--file", required=True); s.add_argument("--yes", action="store_true")
     s = sub.add_parser("set-project"); s.add_argument("--project", required=True); s.add_argument("--target", type=int, default=None)
     s.add_argument("--calibration", type=int, default=None); s.add_argument("--training-required", type=int, default=None, choices=[0, 1])

@@ -1,5 +1,6 @@
-/* PRISM v1.1 client: invite/recovery password set-up, project launcher (roster), instructions + training gate,
-   pull-based coding queue with active-time tracking, progress/revisit, admin table. No build step. */
+/* PRISM client (v1.2.4): invite/recovery password set-up, project launcher (roster), instructions + training gate,
+   pull-based coding queue with active-time tracking (two-pane layout: text left with its own scrollbar, form right),
+   progress/revisit, admin dashboard. No build step. */
 (function () {
   const cfg = window.PRISM_CONFIG;
   const initialHash = location.hash || "";
@@ -13,11 +14,12 @@
   // ---------------------------------------------------------------- helpers
   const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  const md = (t) => esc(t).replace(/^## (.*)$/gm, "<h2>$1</h2>").replace(/^# (.*)$/gm, "<h2>$1</h2>")
-                          .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>");
+  const md = (t) => esc(t).replace(/^### (.*)$/gm, "<h3>$1</h3>").replace(/^## (.*)$/gm, "<h2>$1</h2>").replace(/^# (.*)$/gm, "<h2>$1</h2>")
+                          .replace(/`([^`\n]+)`/g, "<code>$1</code>").replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>");
   function show(screen) {
     document.querySelectorAll(".screen").forEach((s) => (s.hidden = true));
     $(`screen-${screen}`).hidden = false;
+    document.querySelector("main").classList.toggle("wide", screen === "work" || screen === "training");   // two-pane coding layout
     document.querySelectorAll("nav a").forEach((a) => a.classList.toggle("active", a.getAttribute("href") === `#${screen}`));
   }
   function parseRoute() {
@@ -157,7 +159,7 @@
     $("training-context").hidden = !t.display?.context; $("training-context").textContent = t.display?.context || "";
     renderForm(state.project.form_spec || [], null, $("training-form"));
     $("training-feedback").hidden = true; $("training-next").hidden = true; $("training-check").hidden = false; $("training-error").hidden = true;
-    window.scrollTo({ top: 0 });
+    window.scrollTo({ top: 0 }); $("training-pane").scrollTop = 0;
   }
   $("training-check").addEventListener("click", async (ev) => {
     ev.preventDefault();
@@ -196,7 +198,7 @@
     const p = state.project;
     if (trainingPending(p)) { location.hash = `#start/${p.project_id}`; return; }
     $("work-project").textContent = p.name;
-    wireToggle("rubric-toggle", "rubric", "rubric", p.rubric_text || (p.rubric_url ? `Rubric: ${p.rubric_url}` : ""));
+    wireToggle("rubric-toggle", "rubric", "rubric", p.rubric_text || "");   // optional second document; the button is hidden when it is empty
     wireToggle("instr-toggle", "instr", "instructions", p.instructions_text);
     await startSession(p.project_id);
     await claimNext();
@@ -217,7 +219,7 @@
     renderForm(state.project.form_spec || [], null, $("annotation-form"));
     $("item").hidden = false;
     startItemTimer();
-    window.scrollTo({ top: 0 });
+    window.scrollTo({ top: 0 }); $("item-pane").scrollTop = 0;
   }
 
   // ---------------------------------------------------------------- generic form rendering

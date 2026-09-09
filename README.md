@@ -24,7 +24,7 @@ docs/SPEC.md                                the design document
    turn OFF "Allow new users to sign up" (accounts are created by the admin script).
 2. `cp .env.example .env` and paste the secret key (from Project Settings → API keys) into `.env`.
 3. `python3 admin/prism_admin.py create-coder --email you@calpoly.edu --name "Sean" --role admin`
-4. `python3 admin/prism_admin.py import --items ../Synesthesia/Results/validation/prism/syn-A-passage-precision.json --calibration-n 20 --rubric-text ../Synesthesia/Docs/coding_rubric.md`
+4. `python3 admin/prism_admin.py import --items ../Synesthesia/Results/validation/prism/syn-A-passage-precision.json --calibration-n 20 --instructions-text ../Synesthesia/Results/validation/prism/syn-A-instructions.md`
 5. Push to `main`; GitHub Pages serves the app.
 
 ## Daily use

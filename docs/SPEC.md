@@ -150,3 +150,5 @@ then a meeting" calibration is replaced by a rolling process (training → keyed
 the dashboard → FAQ updates), since RAs join at different times; a CSV export includes hidden fields and is therefore
 treated like a KEY file. Phase-2 items still open: gold seeding in the pool, adjudication beyond the calibration block,
 hour reports, span/tag field types for passage-marking and taxonomy projects. Operations playbook: `CLAUDE.md` in the repo.
+
+2026-09-08 (later, v1.2.4): the rubric is retired as a separate coder-facing document. Each project shows a single instructions text (the rubric's field rules were merged into the ket-0 and mus-A instructions; `set-rubric --clear` empties the field). The coding and training screens use a two-pane layout: the item text on the left with its own scrollbar, the form on the right, stacked on narrow windows.
