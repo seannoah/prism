@@ -1,4 +1,4 @@
-/* PRISM client (v1.2.4): invite/recovery password set-up, project launcher (roster), instructions + training gate,
+/* PRISM client (v1.2.5): invite/recovery password set-up, project launcher (roster), instructions + training gate,
    pull-based coding queue with active-time tracking (two-pane layout: text left with its own scrollbar, form right),
    progress/revisit, admin dashboard. No build step. */
 (function () {
@@ -13,6 +13,8 @@
 
   // ---------------------------------------------------------------- helpers
   const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  // projects are listed alphabetically everywhere (the database functions return them in creation order)
+  const byName = (key) => (a, b) => String(a[key] ?? "").localeCompare(String(b[key] ?? ""), undefined, { numeric: true, sensitivity: "base" });
   const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const md = (t) => esc(t).replace(/^### (.*)$/gm, "<h3>$1</h3>").replace(/^## (.*)$/gm, "<h2>$1</h2>").replace(/^# (.*)$/gm, "<h2>$1</h2>")
                           .replace(/`([^`\n]+)`/g, "<code>$1</code>").replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>");
@@ -93,7 +95,7 @@
   async function loadProjects() {
     const { data, error } = await sb.rpc("my_projects");
     if (error) { console.error(error); state.projects = []; return; }
-    state.projects = data || [];
+    state.projects = (data || []).slice().sort(byName("name"));
     // the form spec is not part of my_projects(); fetch it for the granted projects
     if (state.projects.length) {
       const ids = state.projects.map((p) => p.project_id);
@@ -330,7 +332,7 @@
     const { data, error } = await sb.rpc("my_progress");
     const tb = $("progress-table").querySelector("tbody");
     if (error) { tb.innerHTML = `<tr><td colspan="6" class="error">${esc(error.message)}</td></tr>`; return; }
-    tb.innerHTML = (data || []).map((r) => `<tr><td>${esc(r.project_name)}</td><td>${esc(r.status)}</td><td>${r.n_done}</td><td>${r.n_skipped}</td><td>${fmt(Number(r.active_seconds))}</td><td>${r.n_items}</td></tr>`).join("") || `<tr><td colspan="6" class="muted">Nothing yet.</td></tr>`;
+    tb.innerHTML = (data || []).slice().sort(byName("project_name")).map((r) => `<tr><td>${esc(r.project_name)}</td><td>${esc(r.status)}</td><td>${r.n_done}</td><td>${r.n_skipped}</td><td>${fmt(Number(r.active_seconds))}</td><td>${r.n_items}</td></tr>`).join("") || `<tr><td colspan="6" class="muted">Nothing yet.</td></tr>`;
     loadRevisit();
   }
   $("revisit-project").addEventListener("change", loadRevisit);
@@ -384,7 +386,7 @@
   async function loadAdmin() {
     const [ov, co] = await Promise.all([sb.rpc("admin_overview"), sb.rpc("admin_coders")]);
     if (ov.error || co.error) { $("admin-projects").innerHTML = `<p class="error">${esc((ov.error || co.error).message)} — has migration 003 been run?</p>`; return; }
-    adm.overview = ov.data || []; adm.coders = co.data || [];
+    adm.overview = (ov.data || []).slice().sort(byName("name")); adm.coders = co.data || [];
     renderAdminProjects(); renderAdminRAs(); renderAdminAccess();
     $("cal-project").innerHTML = adm.overview.map((p) => `<option value="${p.project_id}">${esc(p.name)}</option>`).join("");
     if (adm.tab === "calibration") loadCalibration();

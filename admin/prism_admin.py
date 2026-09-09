@@ -317,7 +317,7 @@ def cmd_set_form(c: Client, a):
 def cmd_sync_exports(c: Client, a):
     out_dir = Path(a.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    for p in c.select("projects", {"select": "id,name", "order": "created_at"}):
+    for p in c.select("projects", {"select": "id,name", "order": "name"}):
         class A:
             project = p["name"]
             out = str(out_dir / f"prism_export_{p['name']}.csv")
@@ -343,7 +343,7 @@ def _project(c: Client, name: str) -> dict:
 
 
 def cmd_status(c: Client, a):
-    projects = c.select("projects", {"select": "id,name,status,target_coverage,calibration_n", "order": "created_at"})
+    projects = c.select("projects", {"select": "id,name,status,target_coverage,calibration_n", "order": "name"})
     if a.project:
         projects = [p for p in projects if p["name"] == a.project]
     profiles = {p["user_id"]: p for p in c.select("profiles", {"select": "user_id,display_name,email"})}

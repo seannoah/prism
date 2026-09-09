@@ -56,6 +56,22 @@ Sean's; the session's checks are the unauthenticated login page in the Browser p
   `../Ketamine` (playbook `../Ketamine/CLAUDE.md`; neither `../Ketamine` nor `../Psychedelic_music` is a git repo, so their
   edits are just files; `../Synesthesia` is, and its shared files were committed there). Sean is a member of all nine projects;
   no RAs invited yet. The security test has not been run since the split layout (it codes one item; re-import after).
+- 2026-09-08 (ketamine study session, Claude Code): three ketamine projects imported from `../Ketamine/Results/validation/prism/`
+  (built by `../Ketamine/Analysis/build_prism_projects.py`): `ket-0-report-survey` (100 whole reports, coverage 2, calibration 10,
+  4 training items, rubric `../Ketamine/Docs/ket-0-rubric.md`, instructions `ket-0-instructions.md`), `ket-R-sentence-recall` (the
+  same 100 reports as numbered sentences, coverage 2, calibration 10, 3 training items; `ket-R-instructions.md` shown as both
+  instructions and rubric) and `ket-S-passage-scope` (400 model passages with two sentences of context each side, coverage 2,
+  calibration 20, 6 training items with provisional keys; `ket-S-instructions.md`). Sean's edited texts were pushed the same day
+  with `set-instructions` / `set-rubric`. `ket-D-distillation` followed on 2026-09-09 (300 passages with their model statements,
+  coverage 2, calibration 20, 6 training items; `ket-D-instructions.md`). Sean is a member of all four (preview); no RAs invited.
+  Still to come: the two `ket-T` projects (after the ketamine stage 06). The ketamine playbook is `../Ketamine/CLAUDE.md`; its exports go to
+  `../Ketamine/Results/validation/prism_exports/` (stage 08 there). Hidden fields carry `report_id`, passage ids and the model name.
+- 2026-09-09: v1.2.5: projects are listed alphabetically everywhere (launcher, progress table, admin tabs and dropdowns, CLI
+  `status`); the sort is client-side in `app.js`, so the database functions still return creation order and no migration was
+  needed. Header subtitle is now "Psychopharmacology Research Intern Scoring & Measurement" (no "Portal"). Two more ketamine
+  projects were imported by the Ketamine session on 2026-09-09: `ket-D-distillation` (300 items, coverage 2, calibration 20,
+  6 training items) and `ket-S-passage-scope` (400, coverage 2, calibration 20, 6 training); both arrived with their instructions
+  file loaded a second time as the rubric, cleared here with `set-rubric --clear`. Eleven projects in all, Sean a member of each.
 - Rolling calibration flow (no synchronous meeting) is the adopted process; see the section below.
 
 ## Hard rules
