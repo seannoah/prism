@@ -1,18 +1,24 @@
-/* PRISM client (v1.2.5): invite/recovery password set-up, project launcher (roster), instructions + training gate,
-   pull-based coding queue with active-time tracking (two-pane layout: text left with its own scrollbar, form right),
-   progress/revisit, admin dashboard. No build step. */
+/* PRISM client (v1.2.6): invite/recovery password set-up (e-mail links and admin-made links), project launcher (roster),
+   instructions + training gate, pull-based coding queue with active-time tracking, drafts kept in the browser until an item
+   is submitted, two-pane layout (text left with its own scrollbar, form right), progress/revisit, admin dashboard. No build step. */
 (function () {
   const cfg = window.PRISM_CONFIG;
   const initialHash = location.hash || "";
-  const needPassword = /type=(invite|recovery|signup)/.test(initialHash);
+  const hashParams = new URLSearchParams(initialHash.slice(1));
+  // a link made by the admin CLI arrives as #token_hash=...&type=...: nothing happens until the person presses the button
+  const linkToken = hashParams.get("token_hash") ? { token_hash: hashParams.get("token_hash"), type: hashParams.get("type") || "invite" } : null;
+  // an e-mail link that was already used (mail scanners open them) or has expired arrives as #error=...
+  const linkError = hashParams.get("error_description") || hashParams.get("error") || "";
+  const needPassword = /type=(invite|recovery|signup)/.test(initialHash) && !linkToken;
   const sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabasePublishableKey);
   const $ = (id) => document.getElementById(id);
   const state = { user: null, profile: null, projects: [], project: null, item: null, spec: [], training: [], tIndex: 0,
                   itemSeconds: 0, sessionSeconds: 0, sessionId: null, sessionProject: null, lastActivity: Date.now(),
-                  ticking: null, heartbeat: null, needPassword };
+                  ticking: null, heartbeat: null, needPassword, linkToken, token: null, sessionStarting: false };
 
   // ---------------------------------------------------------------- helpers
   const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  const fmtH = (s) => { const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? `${h} h ${String(m).padStart(2, "0")} min` : `${m} min`; };
   // projects are listed alphabetically everywhere (the database functions return them in creation order)
   const byName = (key) => (a, b) => String(a[key] ?? "").localeCompare(String(b[key] ?? ""), undefined, { numeric: true, sensitivity: "base" });
   const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -31,7 +37,7 @@
     return { screen: screen || "home", arg: arg || null };
   }
   async function route() {
-    if (!state.user) return show("login");
+    if (!state.user) return show(state.linkToken ? "welcome" : "login");
     if (state.needPassword) return show("setpw");
     const { screen, arg } = parseRoute();
     if (screen === "admin" && state.profile?.role !== "admin") { location.hash = "#home"; return; }
@@ -49,7 +55,8 @@
     if (screen === "admin") await loadAdmin();
   }
   window.addEventListener("hashchange", route);
-  ["keydown", "mousedown", "mousemove", "scroll", "touchstart"].forEach((e) => document.addEventListener(e, () => (state.lastActivity = Date.now()), { passive: true }));
+  ["keydown", "mousedown", "mousemove", "wheel", "scroll", "touchstart", "touchmove", "pointerdown", "input"]
+    .forEach((e) => document.addEventListener(e, () => (state.lastActivity = Date.now()), { passive: true, capture: true }));
 
   // ---------------------------------------------------------------- auth
   $("login-form").addEventListener("submit", async (ev) => {
@@ -71,13 +78,33 @@
     if (a !== b) { $("setpw-error").textContent = "The two passwords differ."; $("setpw-error").hidden = false; return; }
     const { error } = await sb.auth.updateUser({ password: a });
     if (error) { $("setpw-error").textContent = error.message; $("setpw-error").hidden = false; return; }
-    state.needPassword = false;
+    state.needPassword = false; $("setpw-cancel").hidden = true;
     location.hash = "#home";
     route();
   });
-  $("logout").addEventListener("click", async () => { stopTimers(); await sb.auth.signOut(); location.hash = ""; });
+  if (linkError) {
+    $("login-error").textContent = "This sign-in link has already been used or has expired. Ask Dr. Noah for a new link, or use \"Forgot your password?\" below.";
+    $("login-error").hidden = false;
+  }
+  $("welcome-go").addEventListener("click", async () => {
+    if (!state.linkToken) return;
+    $("welcome-error").hidden = true; $("welcome-go").disabled = true;
+    state.needPassword = true;   // the session arrives through onAuthStateChange, which then shows the password screen
+    const { error } = await sb.auth.verifyOtp({ token_hash: state.linkToken.token_hash, type: state.linkToken.type });
+    $("welcome-go").disabled = false;
+    if (error) { state.needPassword = false; $("welcome-error").textContent = `${error.message}. Ask Dr. Noah for a new link.`; $("welcome-error").hidden = false; return; }
+    state.linkToken = null;
+  });
+  $("nav-password").addEventListener("click", () => { state.needPassword = true; $("setpw-cancel").hidden = false; route(); });
+  $("setpw-cancel").addEventListener("click", () => { state.needPassword = false; $("setpw-cancel").hidden = true; location.hash = "#home"; route(); });
+  $("logout").addEventListener("click", async () => { sendHeartbeat(true); stopTimers(); await sb.auth.signOut(); location.hash = ""; });
   sb.auth.onAuthStateChange(async (event, session) => {
+    state.token = session?.access_token || null;   // for the closing heartbeat (a keep-alive request the library cannot make)
     if (event === "PASSWORD_RECOVERY") state.needPassword = true;
+    // token refreshes (about hourly) and tab-focus events arrive here too. Rebuilding the screen for them emptied the form
+    // and reset the clock mid-item (the "page refreshed" reports of 2026-10), so when the user is unchanged, do nothing.
+    const uid = session?.user?.id || null;
+    if (uid && state.user?.id === uid) { if (event === "PASSWORD_RECOVERY") route(); return; }
     state.user = session?.user || null;
     if (!state.user) { state.profile = null; $("nav").hidden = true; return route(); }
     const { data } = await sb.from("profiles").select("*").eq("user_id", state.user.id).maybeSingle();
@@ -111,7 +138,7 @@
     if (!state.projects.length) { box.innerHTML = `<p class="muted">No projects have been assigned to you yet.</p>`; return; }
     box.innerHTML = state.projects.map((p) => {
       const pend = trainingPending(p);
-      const meta = `${p.n_items} items in the shared pool, each rated by ${p.target_coverage} people · you: ${p.n_done} done, ${p.n_skipped} skipped, ${fmt(Number(p.active_seconds))} active` +
+      const meta = `${p.n_items} items in the shared pool, each rated by ${p.target_coverage} people · you: ${p.n_done} done, ${p.n_skipped} skipped, ${fmtH(Number(p.item_seconds ?? p.active_seconds))} on items` +
                    (Number(p.n_training) ? ` · training ${p.training_done_at ? "completed" : `${p.n_training_answered}/${p.n_training} done`}` : "") +
                    (p.status !== "open" ? " · closed" : "");
       const btn = p.status !== "open" ? `<a href="#progress" class="secondary-link">Review</a>`
@@ -218,9 +245,11 @@
     $("item-text").textContent = row.display?.text || "";
     const ctx = row.display?.context;
     $("item-context").hidden = !ctx; $("item-context").textContent = ctx || "";
-    renderForm(state.project.form_spec || [], null, $("annotation-form"));
+    const draft = loadDraft(row.assignment_id);
+    renderForm(state.project.form_spec || [], draft ? draft.values : null, $("annotation-form"));
+    $("item-restored").hidden = !draft;
     $("item").hidden = false;
-    startItemTimer();
+    startItemTimer(draft ? draft.seconds : 0);
     window.scrollTo({ top: 0 }); $("item-pane").scrollTop = 0;
   }
 
@@ -295,7 +324,7 @@
                                                           p_notes: values.notes || null, p_time_spent_s: state.itemSeconds });
     $("submit").disabled = false;
     if (error) { $("form-error").textContent = error.message; $("form-error").hidden = false; return; }
-    state.item = null;
+    clearDraft(state.item.assignment_id); state.item = null; sendHeartbeat(false);
     await claimNext();
   });
   $("skip").addEventListener("click", async (ev) => {
@@ -305,34 +334,76 @@
     if (!reason || !reason.trim()) return;
     const { error } = await sb.rpc("skip_item", { p_assignment: state.item.assignment_id, p_reason: reason.trim() });
     if (error) { $("form-error").textContent = error.message; $("form-error").hidden = false; return; }
-    state.item = null;
+    clearDraft(state.item.assignment_id); state.item = null;
     await claimNext();
   });
 
+  // ---------------------------------------------------------------- drafts: answers and the item clock stay in this browser until the item is submitted
+  const draftKey = (assignmentId) => `prism-draft-${assignmentId}`;
+  function saveDraft() {
+    if (!state.item) return;
+    try { localStorage.setItem(draftKey(state.item.assignment_id), JSON.stringify({ values: readValues($("annotation-form"), true), seconds: state.itemSeconds, at: Date.now() })); } catch (e) {}
+  }
+  function loadDraft(assignmentId) {
+    try {
+      for (const k of Object.keys(localStorage)) {   // forget drafts of items that were submitted elsewhere or expired long ago
+        if (k.startsWith("prism-draft-") && Date.now() - (JSON.parse(localStorage.getItem(k) || "{}").at || 0) > 14 * 86400e3) localStorage.removeItem(k);
+      }
+      const d = JSON.parse(localStorage.getItem(draftKey(assignmentId)) || "null");
+      return d && d.values ? d : null;
+    } catch (e) { return null; }
+  }
+  function clearDraft(assignmentId) { try { localStorage.removeItem(draftKey(assignmentId)); } catch (e) {} }
+  ["input", "change"].forEach((e) => $("annotation-form").addEventListener(e, saveDraft));
+
   // ---------------------------------------------------------------- timers (active seconds only)
   function active() { return !document.hidden && Date.now() - state.lastActivity < cfg.idleSeconds * 1000; }
-  function startItemTimer() {
-    state.itemSeconds = 0; $("timer").textContent = "0:00";
+  function startItemTimer(initial = 0) {
+    state.itemSeconds = initial; $("timer").textContent = fmt(initial);
     if (state.ticking) clearInterval(state.ticking);
-    state.ticking = setInterval(() => { if (active()) { state.itemSeconds++; state.sessionSeconds++; $("timer").textContent = fmt(state.itemSeconds); } }, 1000);
+    state.ticking = setInterval(() => {
+      if (!active()) return;
+      state.itemSeconds++; state.sessionSeconds++; $("timer").textContent = fmt(state.itemSeconds);
+      if (state.itemSeconds % 15 === 0) saveDraft();
+    }, 1000);
   }
   function stopItemTimer() { if (state.ticking) clearInterval(state.ticking); state.ticking = null; }
   async function startSession(pid) {
-    if (state.sessionId && state.sessionProject === pid) return;
+    if (state.sessionProject === pid && (state.sessionId || state.sessionStarting)) return;
     stopTimers();
-    const { data } = await sb.rpc("heartbeat", { p_session: null, p_project: pid, p_active_seconds: 0 });
-    state.sessionId = data || null; state.sessionProject = pid; state.sessionSeconds = 0;
-    state.heartbeat = setInterval(() => { if (state.sessionId) sb.rpc("heartbeat", { p_session: state.sessionId, p_project: pid, p_active_seconds: state.sessionSeconds }); }, cfg.heartbeatSeconds * 1000);
+    state.sessionProject = pid; state.sessionStarting = true;
+    const { data, error } = await sb.rpc("heartbeat", { p_session: null, p_project: pid, p_active_seconds: 0 });
+    state.sessionStarting = false;
+    if (error) { console.warn("session", error.message); return; }
+    state.sessionId = data || null; state.sessionSeconds = 0;
+    state.heartbeat = setInterval(() => sendHeartbeat(false), cfg.heartbeatSeconds * 1000);
   }
-  function stopTimers() { stopItemTimer(); if (state.heartbeat) clearInterval(state.heartbeat); state.heartbeat = null; state.sessionId = null; state.sessionProject = null; state.sessionSeconds = 0; }
-  window.addEventListener("beforeunload", () => { if (state.sessionId) sb.rpc("heartbeat", { p_session: state.sessionId, p_project: state.sessionProject, p_active_seconds: state.sessionSeconds }); });
+  // The library only sends a request when its result is awaited; the old interval never did, so no session time was recorded
+  // before 2026-10-07. The closing heartbeat is a keep-alive fetch, which survives the page going away.
+  function sendHeartbeat(closing) {
+    if (!state.sessionId) return;
+    const body = { p_session: state.sessionId, p_project: state.sessionProject, p_active_seconds: state.sessionSeconds };
+    if (closing) {
+      if (!state.token) return;
+      try {
+        fetch(`${cfg.supabaseUrl}/rest/v1/rpc/heartbeat`, { method: "POST", keepalive: true, body: JSON.stringify(body),
+          headers: { apikey: cfg.supabasePublishableKey, Authorization: `Bearer ${state.token}`, "Content-Type": "application/json" } });
+      } catch (e) {}
+      return;
+    }
+    sb.rpc("heartbeat", body).then(({ error }) => { if (error) console.warn("heartbeat", error.message); });
+  }
+  function stopTimers() { stopItemTimer(); if (state.heartbeat) clearInterval(state.heartbeat); state.heartbeat = null; state.sessionId = null; state.sessionProject = null; state.sessionSeconds = 0; state.sessionStarting = false; }
+  window.addEventListener("pagehide", () => sendHeartbeat(true));
+  window.addEventListener("beforeunload", () => sendHeartbeat(true));
+  document.addEventListener("visibilitychange", () => { if (document.hidden) { saveDraft(); sendHeartbeat(true); } });
 
   // ---------------------------------------------------------------- progress + revisit
   async function loadProgress() {
     const { data, error } = await sb.rpc("my_progress");
     const tb = $("progress-table").querySelector("tbody");
     if (error) { tb.innerHTML = `<tr><td colspan="6" class="error">${esc(error.message)}</td></tr>`; return; }
-    tb.innerHTML = (data || []).slice().sort(byName("project_name")).map((r) => `<tr><td>${esc(r.project_name)}</td><td>${esc(r.status)}</td><td>${r.n_done}</td><td>${r.n_skipped}</td><td>${fmt(Number(r.active_seconds))}</td><td>${r.n_items}</td></tr>`).join("") || `<tr><td colspan="6" class="muted">Nothing yet.</td></tr>`;
+    tb.innerHTML = (data || []).slice().sort(byName("project_name")).map((r) => `<tr><td>${esc(r.project_name)}</td><td>${esc(r.status)}</td><td>${r.n_done}</td><td>${r.n_skipped}</td><td>${fmtH(Number(r.item_seconds ?? r.active_seconds))}</td><td>${r.n_items}</td></tr>`).join("") || `<tr><td colspan="6" class="muted">Nothing yet.</td></tr>`;
     loadRevisit();
   }
   $("revisit-project").addEventListener("change", loadRevisit);
@@ -401,7 +472,7 @@
         <h3>${esc(p.name)} <span class="small ${p.status === "open" ? "ok" : "warn"}">${esc(p.status)}</span></h3>
         <div class="meta">${esc(p.description || "")}</div>
         <div class="meta">Items at target coverage: ${bar(Number(p.items_at_target), Number(p.n_items), Number(p.items_at_target) === Number(p.n_items) && p.n_items > 0 ? "full" : "")}</div>
-        <div class="meta">Ratings done ${p.n_done} (${p.n_items} items × ${p.target_coverage} = ${Number(p.n_items) * Number(p.target_coverage)} needed) · skipped ${p.n_skipped} · open claims ${p.n_open_claims} · ${p.hours} h logged</div>
+        <div class="meta">Ratings done ${p.n_done} (${p.n_items} items × ${p.target_coverage} = ${Number(p.n_items) * Number(p.target_coverage)} needed) · skipped ${p.n_skipped} · open claims ${p.n_open_claims} · ${p.item_hours != null ? `${p.item_hours} h on items (${p.hours} h in sessions)` : `${p.hours} h logged`}</div>
         <div class="meta">Items by number of ratings: ${esc(hist || "–")} · members ${p.n_members} (${p.n_trained} trained) · training items ${p.n_training}</div>
         <div class="meta tight">Target coverage <input type="number" min="1" max="10" value="${p.target_coverage}" data-f="target"> ·
           calibration items <input type="number" min="0" value="${p.calibration_n}" data-f="cal"> ·
@@ -435,7 +506,7 @@
         const r = adm.coders.find((x) => x.user_id === person.user_id && x.project_id === p.project_id);
         if (!r || !r.member) { html += `<td class="muted">–</td>`; continue; }
         const cal = r.calibration_with_key > 0 ? ` · calibration agreement ${Math.round(100 * Number(r.calibration_agreement))}% (${r.calibration_with_key} keyed)` : (Number(r.calibration_coded) ? ` · ${r.calibration_coded} calibration items coded` : "");
-        html += `<td>${r.n_done} done, ${r.n_skipped} skipped, ${r.hours} h<br><span class="muted">training ${r.training_done_at ? "done" : "pending"}${r.last_seen ? " · last " + new Date(r.last_seen).toLocaleDateString() : ""}${esc(cal)}</span>` +
+        html += `<td>${r.n_done} done, ${r.n_skipped} skipped, ${r.item_hours != null ? `${r.item_hours} h on items` : `${r.hours} h`}<br><span class="muted">${r.item_hours != null ? `sessions ${r.hours} h · claim-to-submit ${r.wall_hours} h · ` : ""}training ${r.training_done_at ? "done" : "pending"}${r.last_seen ? " · last " + new Date(r.last_seen).toLocaleDateString() : ""}${esc(cal)}</span>` +
                 `<br><button class="link reset-training" data-user="${person.user_id}" data-project="${p.project_id}">reset training</button></td>`;
       }
       html += `</tr>`;

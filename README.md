@@ -30,7 +30,9 @@ docs/SPEC.md                                the design document
 ## Daily use
 
 ```
-python3 admin/prism_admin.py invite --email ra@calpoly.edu --name "Ada" --projects syn-A-passage-precision   # e-mails an invitation
+python3 admin/prism_admin.py invite --email ra@calpoly.edu --name "Ada" --projects syn-A-passage-precision --link   # prints a link you send yourself (recommended)
+python3 admin/prism_admin.py invite --email ra@calpoly.edu --name "Ada" --projects syn-A-passage-precision          # or: Supabase e-mails a one-time link
+python3 admin/prism_admin.py reset-link --email ra@calpoly.edu                   # a fresh link for an existing account
 python3 admin/prism_admin.py create-coder --email ra@calpoly.edu --name "Ada"     # alternative: prints a temporary password
 python3 admin/prism_admin.py status                                               # coverage + per-coder time
 python3 admin/prism_admin.py export --project syn-A-passage-precision --out exports/syn-A.csv

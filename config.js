@@ -4,6 +4,6 @@ window.PRISM_CONFIG = {
   supabaseUrl: "https://colimjlptydvfsgoikyw.supabase.co",
   supabasePublishableKey: "sb_publishable_HRoCIZtfsY4m0E8HCMc9HA_BpNZVMuC",
   appName: "PRISM",
-  idleSeconds: 120,        // timer pauses after this long without keyboard/mouse activity
+  idleSeconds: 300,        // the clocks pause after this long without keyboard, mouse, scroll or touch activity (reading counts)
   heartbeatSeconds: 60,    // session time is written to the database this often
 };

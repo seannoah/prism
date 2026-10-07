@@ -14,8 +14,12 @@ Commands
     deactivate --email a@b.edu                      keeps the annotations, blocks login
     import --items path.json [--calibration-n N] [--rubric-text path.md] [--instructions-text path.md] [--replace]
                                                     create a project + its items from the stage-10 JSON
-    invite --email a@b.edu --name "Ada" [--projects syn-A,syn-BC]   send a Supabase invite e-mail (the RA sets their own
-                                                    password on the site) + profile + project grants
+    invite --email a@b.edu --name "Ada" [--projects syn-A,syn-BC] [--link]
+                                                    create the account + profile + grants. With --link no e-mail is sent: the
+                                                    command prints a link into PRISM for you to send yourself (recommended:
+                                                    campus mail scanning used up Supabase's one-time e-mail links, 2026-09/10).
+                                                    Without --link Supabase e-mails the invitation (2 e-mails per hour at most).
+    reset-link --email a@b.edu                      print a password-reset link into PRISM for an existing account (same idea)
     grant --email a@b.edu --projects syn-A,syn-BC   / revoke --email ... --projects ...
     members --project NAME                          roster with training status
     reset-training --email a@b.edu --project NAME   let a coder redo the training
@@ -39,6 +43,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import datetime
 import json
 import os
 import secrets
@@ -89,8 +94,21 @@ class Client:
             sys.exit(f"{method} {path} -> HTTP {e.code}: {e.read().decode()[:500]}")
 
     # PostgREST
+    PAGE = 1000   # the server returns at most 1000 rows per request; page through unless the caller set a limit
+    ORDER = {"profiles": "user_id", "project_members": "project_id,user_id"}
+
     def select(self, table: str, params: dict | None = None):
-        return self._req("GET", f"/rest/v1/{table}", params=params)
+        params = dict(params or {})
+        if "limit" in params:
+            return self._req("GET", f"/rest/v1/{table}", params=params)
+        params.setdefault("order", self.ORDER.get(table, "id"))
+        out, offset = [], 0
+        while True:
+            rows = self._req("GET", f"/rest/v1/{table}", params={**params, "limit": self.PAGE, "offset": offset}) or []
+            out.extend(rows)
+            if len(rows) < self.PAGE:
+                return out
+            offset += self.PAGE
 
     def insert(self, table: str, rows, upsert: bool = False):
         prefer = "return=representation" + (",resolution=merge-duplicates" if upsert else "")
@@ -113,6 +131,14 @@ class Client:
     def invite_user(self, email: str, name: str, redirect_to: str | None = None):
         path = "/auth/v1/invite" + (f"?redirect_to={urllib.parse.quote(redirect_to, safe='')}" if redirect_to else "")
         return self._req("POST", path, body={"email": email, "data": {"display_name": name}})
+
+    def generate_link(self, kind: str, email: str, name: str | None = None):
+        body = {"type": kind, "email": email, "redirect_to": APP_URL}
+        if name:
+            body["data"] = {"display_name": name}
+        res = self._req("POST", "/auth/v1/admin/generate_link", body=body)
+        props = res.get("properties") or res
+        return res, f"{APP_URL}#token_hash={props['hashed_token']}&type={kind}"
 
     def list_users(self):
         out = self._req("GET", "/auth/v1/admin/users", params={"per_page": 1000})
@@ -193,13 +219,32 @@ def _grant(c: Client, user_id: str, names: list[str]) -> None:
         print(f"  granted {name}")
 
 
+def _print_link(link: str) -> None:
+    print("  send them this link yourself (nothing happens until they press the button on the page; it works once):")
+    print(f"  {link}")
+
+
 def cmd_invite(c: Client, a):
-    user = c.invite_user(a.email, a.name, redirect_to=APP_URL)
+    if a.link:
+        user, link = c.generate_link("invite", a.email, a.name)
+    else:
+        user, link = c.invite_user(a.email, a.name, redirect_to=APP_URL), None
     uid = user["id"]
     c.insert("profiles", [{"user_id": uid, "display_name": a.name, "email": a.email, "role": a.role, "active": True}], upsert=True)
-    print(f"invited {a.role} {a.name} <{a.email}> user_id {uid}; they set their password from the e-mail link")
+    if link:
+        print(f"created {a.role} {a.name} <{a.email}> user_id {uid}; no e-mail was sent")
+        _print_link(link)
+    else:
+        print(f"invited {a.role} {a.name} <{a.email}> user_id {uid}; they set their password from the e-mail link")
     if a.projects:
         _grant(c, uid, [x.strip() for x in a.projects.split(",") if x.strip()])
+
+
+def cmd_reset_link(c: Client, a):
+    prof = _profile(c, a.email)
+    _, link = c.generate_link("recovery", a.email)
+    print(f"{prof['display_name']} <{a.email}>: password-reset link made")
+    _print_link(link)
 
 
 def cmd_grant(c: Client, a):
@@ -347,10 +392,19 @@ def cmd_status(c: Client, a):
     if a.project:
         projects = [p for p in projects if p["name"] == a.project]
     profiles = {p["user_id"]: p for p in c.select("profiles", {"select": "user_id,display_name,email"})}
+    all_assigns = c.select("assignments", {"select": "id,item_id,coder_id,status,claimed_at,expires_at"})
+    anns = {n["assignment_id"]: n for n in c.select("annotations", {"select": "assignment_id,time_spent_s,submitted_at"})}
+    all_sessions = c.select("sessions", {"select": "coder_id,active_seconds,project_id"})
+    def wall(x):   # claim-to-submit seconds of a done assignment
+        n = anns.get(x["id"])
+        if not n:
+            return 0
+        f = lambda v: datetime.datetime.strptime(v[:19], "%Y-%m-%dT%H:%M:%S")
+        return max(0, (f(n["submitted_at"]) - f(x["claimed_at"])).total_seconds())
     for p in projects:
         items = c.select("items", {"select": "id,seq,is_training", "project_id": f"eq.{p['id']}"})
         ids = {i["id"] for i in items if not i.get("is_training")}   # the histogram covers the pool only
-        assigns = [x for x in c.select("assignments", {"select": "item_id,coder_id,status,claimed_at,expires_at"}) if x["item_id"] in ids]
+        assigns = [x for x in all_assigns if x["item_id"] in ids]
         done = {}
         for x in assigns:
             if x["status"] == "done":
@@ -363,13 +417,17 @@ def cmd_status(c: Client, a):
         print(f"\n{p['name']} [{p['status']}] items {len(ids)} (+{n_train} training), target {p['target_coverage']}, "
               f"calibration {p['calibration_n']}, members {len(members)} ({sum(1 for m in members if m['training_done_at'])} trained)")
         print("  items by number of completed annotations: " + ", ".join(f"{k}: {v}" for k, v in sorted(hist.items())))
-        sessions = [s for s in c.select("sessions", {"select": "coder_id,active_seconds,project_id"}) if s["project_id"] == p["id"]]
-        for uid, prof in profiles.items():
-            n_done = sum(1 for x in assigns if x["coder_id"] == uid and x["status"] == "done")
-            n_skip = sum(1 for x in assigns if x["coder_id"] == uid and x["status"] == "skipped")
+        sessions = [s for s in all_sessions if s["project_id"] == p["id"]]
+        for uid, prof in sorted(profiles.items(), key=lambda kv: kv[1]["display_name"]):
+            mine = [x for x in assigns if x["coder_id"] == uid]
+            n_done = sum(1 for x in mine if x["status"] == "done")
+            n_skip = sum(1 for x in mine if x["status"] == "skipped")
+            item_s = sum((anns.get(x["id"]) or {}).get("time_spent_s", 0) for x in mine if x["status"] == "done")
+            wall_s = sum(wall(x) for x in mine if x["status"] == "done")
             secs = sum(s["active_seconds"] for s in sessions if s["coder_id"] == uid)
             if n_done or n_skip or secs:
-                print(f"  {prof['display_name']:24s} done {n_done:4d}  skipped {n_skip:3d}  active {secs / 3600:.2f} h")
+                print(f"  {prof['display_name']:24s} done {n_done:4d}  skipped {n_skip:3d}  on items {item_s / 3600:5.2f} h  "
+                      f"claim-to-submit {wall_s / 3600:5.2f} h  sessions {secs / 3600:5.2f} h")
 
 
 def cmd_export(c: Client, a):
@@ -428,7 +486,8 @@ def main() -> None:
     s = sub.add_parser("import"); s.add_argument("--items", required=True); s.add_argument("--calibration-n", type=int, default=None)
     s.add_argument("--rubric-text", default=None); s.add_argument("--instructions-text", default=None); s.add_argument("--replace", action="store_true")
     s = sub.add_parser("invite"); s.add_argument("--email", required=True); s.add_argument("--name", required=True)
-    s.add_argument("--role", default="coder", choices=["coder", "admin"]); s.add_argument("--projects", default="")
+    s.add_argument("--role", default="coder", choices=["coder", "admin"]); s.add_argument("--projects", default=""); s.add_argument("--link", action="store_true")
+    s = sub.add_parser("reset-link"); s.add_argument("--email", required=True)
     s = sub.add_parser("grant"); s.add_argument("--email", required=True); s.add_argument("--projects", required=True)
     s = sub.add_parser("revoke"); s.add_argument("--email", required=True); s.add_argument("--projects", required=True)
     s = sub.add_parser("members"); s.add_argument("--project", required=True)
@@ -451,7 +510,7 @@ def main() -> None:
     {"create-coder": cmd_create_coder, "list-coders": cmd_list_coders, "set-password": cmd_set_password, "deactivate": cmd_deactivate, "import": cmd_import,
      "status": cmd_status, "export": cmd_export, "close": lambda c, a: cmd_set_status(c, a, "closed"),
      "reopen": lambda c, a: cmd_set_status(c, a, "open"), "delete-project": cmd_delete_project, "invite": cmd_invite,
-     "grant": cmd_grant, "revoke": cmd_revoke, "members": cmd_members, "reset-training": cmd_reset_training,
+     "grant": cmd_grant, "revoke": cmd_revoke, "reset-link": cmd_reset_link, "members": cmd_members, "reset-training": cmd_reset_training,
      "import-training": cmd_import_training, "set-instructions": cmd_set_instructions, "set-rubric": cmd_set_rubric, "set-form": cmd_set_form, "sync-exports": cmd_sync_exports,
      "set-project": cmd_set_project, "add-items": cmd_add_items}[a.cmd](c, a)
 

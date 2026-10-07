@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PRISM</title>
-<link rel="stylesheet" href="styles.css?v=1.2.5">
+<link rel="stylesheet" href="styles.css?v=1.2.6">
 </head>
 <body>
 <header>
@@ -14,6 +14,7 @@
     <a href="#progress">Progress</a>
     <a href="#admin" id="nav-admin" hidden>Admin</a>
     <span id="who"></span>
+    <button id="nav-password" class="link">Password</button>
     <button id="logout" class="link">Sign out</button>
   </nav>
 </header>
@@ -35,9 +36,16 @@
     <form id="setpw-form" class="auth-form">
       <label>New password (at least 8 characters) <input type="password" id="setpw-1" autocomplete="new-password" minlength="8" required></label>
       <label>Repeat it <input type="password" id="setpw-2" autocomplete="new-password" minlength="8" required></label>
-      <button type="submit">Save password</button>
+      <button type="submit">Save password</button> <button type="button" id="setpw-cancel" class="link" hidden>Cancel</button>
       <p id="setpw-error" class="error" hidden></p>
     </form>
+  </section>
+
+  <section id="screen-welcome" class="screen" hidden>
+    <h1>Welcome to PRISM</h1>
+    <p>Press the button to activate your link and choose a password. The link works once, and only from this page.</p>
+    <div class="actions"><button id="welcome-go">Set my password</button></div>
+    <p id="welcome-error" class="error" hidden></p>
   </section>
 
   <section id="screen-home" class="screen" hidden>
@@ -93,6 +101,7 @@
         <div id="item-context" class="context" hidden></div>
       </div>
       <div class="pane pane-form">
+        <p id="item-restored" class="notice small" hidden>Your unsaved answers and time for this item were restored.</p>
         <form id="annotation-form"></form>
         <div class="actions">
           <button id="skip" class="secondary">Skip…</button>
@@ -106,7 +115,7 @@
 
   <section id="screen-progress" class="screen" hidden>
     <h1>Your progress</h1>
-    <table id="progress-table"><thead><tr><th>Project</th><th>Status</th><th>Done</th><th>Skipped</th><th>Active time</th><th>Items in pool</th></tr></thead><tbody></tbody></table>
+    <table id="progress-table"><thead><tr><th>Project</th><th>Status</th><th>Done</th><th>Skipped</th><th>Time on items</th><th>Items in pool</th></tr></thead><tbody></tbody></table>
     <h2>Revisit your last answers</h2>
     <label>Project <select id="revisit-project"></select></label>
     <div id="revisit-list"></div>
@@ -126,9 +135,9 @@
     <p class="muted">New RA accounts (invitations) and new projects or items are created from the command line, or by asking Claude with the PRISM playbook; everything else can be done here.</p>
   </section>
 </main>
-<footer class="muted small"><img class="cp-logo" src="assets/calpoly-logo.svg?v=1.2.5" alt="Cal Poly"><div>Psychopharmacology lab · PI: Dr. Sean Noah</div></footer>
+<footer class="muted small"><img class="cp-logo" src="assets/calpoly-logo.svg?v=1.2.6" alt="Cal Poly"><div>Psychopharmacology lab · PI: Dr. Sean Noah</div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="config.js?v=1.2.5"></script>
-<script src="app.js?v=1.2.5"></script>
+<script src="config.js?v=1.2.6"></script>
+<script src="app.js?v=1.2.6"></script>
 </body>
 </html>

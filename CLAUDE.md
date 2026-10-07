@@ -72,6 +72,23 @@ Sean's; the session's checks are the unauthenticated login page in the Browser p
   projects were imported by the Ketamine session on 2026-09-09: `ket-D-distillation` (300 items, coverage 2, calibration 20,
   6 training items) and `ket-S-passage-scope` (400, coverage 2, calibration 20, 6 training); both arrived with their instructions
   file loaded a second time as the rubric, cleared here with `set-rubric --clear`. Eleven projects in all, Sean a member of each.
+- 2026-10-07: v1.2.6 + migration 004 (`supabase/migrations/004_time_and_links.sql`; Sean pastes it). From RA reports: (1) session
+  time was never recorded because the app's once-a-minute heartbeat never sent its request (supabase-js builders only run when
+  awaited), so every session before this date shows 0 s; the per-item clock (`annotations.time_spent_s`) was always recorded and
+  is now shown as "on items" in `status`, the Progress table, the launcher and the dashboard (the last three once 004 is in).
+  (2) The work screen was rebuilt on every auth event (token refresh about hourly, tab focus in some browsers), which emptied
+  the form and reset the item clock mid-item ("the page refreshed"); events that do not change the signed-in user are now
+  ignored. (3) Drafts: answers and the item clock are kept in localStorage per assignment and restored when the same item is
+  claimed again after any reload; cleared on submit or skip. (4) Idle cut-off 300 s; trackpad and touch scrolling count as
+  activity (scroll events are caught in the capture phase because the text pane's do not bubble). (5) 004: heartbeat extends
+  the coder's open claim by 2 h, so long items are not reassigned; `item_seconds` / `item_hours` / `wall_hours` columns.
+  (6) CLI reads page through Supabase's 1000-row cap (assignments and annotations were a quarter of the way there).
+  (7) Invitations: six of the first seven e-mailed links were spent 9–16 s after sending by mail scanning, so `invite --link`
+  and `reset-link` print a PRISM link (`#token_hash=…&type=…`) that Sean sends himself; the page shows a "Set my password"
+  button and verifies only when pressed; spent e-mail links show a message on the login page; a "Password" menu item lets
+  anyone change their password. Optional for Sean in the Supabase dashboard: point the "Reset password" e-mail template's link
+  at `{{ .SiteURL }}#token_hash={{ .TokenHash }}&type=recovery` so the site's "Forgot your password?" is scanner-proof too,
+  and raise "Email OTP expiration" so links last a day.
 - Rolling calibration flow (no synchronous meeting) is the adopted process; see the section below.
 
 ## Hard rules
@@ -84,6 +101,8 @@ Sean's; the session's checks are the unauthenticated login page in the Browser p
 4. Schema changes go through numbered files in `supabase/migrations/`; Sean pastes them into the Supabase SQL editor
    (a Claude session cannot run SQL there). Say exactly which file to paste.
 5. `import --replace` and `delete-project` destroy annotations: confirm with Sean first.
+6. Invitation and reset links sign an account in: the CLI prints them in Sean's terminal for him to send; never put one in chat,
+   never open one in a browser, never mint one for a real RA without being asked.
 
 ## Deploying a change
 Bump the version string in `index.html` (the `?v=` on styles.css, config.js and app.js) with every push that touches
@@ -97,6 +116,7 @@ those files; browsers cache them aggressively and a stale `app.js` under a new `
   account, so mock the work screen from the console (unhide `#screen-work`, fill `#item-text` and `#annotation-form`) to see the layout.
 - `supabase/migrations/001_init.sql`, `002_roster_training.sql`: schema, row-level security, functions.
 - `supabase/migrations/003_admin_dashboard.sql`: the admin-only functions behind the dashboard.
+- `supabase/migrations/004_time_and_links.sql`: heartbeat keeps the open claim alive; item-time columns for coders and the dashboard.
 - `admin/prism_admin.py`: admin CLI (`python3 admin/prism_admin.py -h` lists every command). `tests/test_coder_permissions.py`:
   security regression test. `How to add a new RA.md`: Sean's own one-line note (untracked).
 - Analysis project that feeds/consumes PRISM: `../Synesthesia` (stage 10 writes `Results/validation/prism/*.json`;
@@ -105,7 +125,8 @@ those files; browsers cache them aggressively and a stale `app.js` under a new `
 ## Plain English → commands
 | Sean says | do |
 |---|---|
-| "add RA x@calpoly.edu (Ada) to syn-A and syn-BC" | `python3 admin/prism_admin.py invite --email x@calpoly.edu --name "Ada" --projects syn-A-passage-precision,syn-BC-recall` (sends the invitation e-mail; the RA sets a password on the site; a Cal Poly address is preferred) |
+| "add RA x@calpoly.edu (Ada) to syn-A and syn-BC" | `python3 admin/prism_admin.py invite --email x@calpoly.edu --name "Ada" --projects syn-A-passage-precision,syn-BC-recall --link` creates the account and grants and prints a PRISM link that Sean e-mails to the RA himself; on the page a "Set my password" button activates it (nothing is spent until then, so mail scanning cannot use it up). Without `--link` Supabase e-mails a one-time link, which campus mail scanning spent within seconds for six of the first seven RAs (2026-09/10), and the built-in mailer allows only 2 e-mails per hour |
+| "the RA's link landed on the login page" / "send a new link" | `reset-link --email x@calpoly.edu` prints a fresh PRISM link for an existing account (Sean sends it); `set-password` is the fallback. The login page now says when a link has already been used |
 | "give Ada access to syn-D" / "remove her from syn-A" | `grant --email ... --projects syn-D-same-modality` / `revoke --email ... --projects ...` |
 | "who is on syn-A / have they done the training?" | `members --project syn-A-passage-precision` |
 | "Ada should redo the training" | `reset-training --email ... --project ...` |
@@ -119,7 +140,8 @@ those files; browsers cache them aggressively and a stale `app.js` under a new `
 | "close project X" / "reopen" | `close --project <name>` / `reopen --project <name>` (also a button in the dashboard) |
 | "raise the coverage of X to 3" / "make the first 30 items calibration" | `set-project --project <name> --target 3` / `--calibration 30` (also editable in the dashboard; takes effect on the next claim) |
 | "add these items to X" | `add-items --project <name> --items <json>` (pool grows; nothing else changes) |
-| "someone is locked out" | `set-password --email ... --password '...'` (Sean runs it himself so the password never appears in chat), or tell them to use "Forgot your password?" on the site |
+| "someone is locked out" | `reset-link --email ...` (Sean sends the printed link), or `set-password --email ... --password '...'` (Sean runs it himself so the password never appears in chat); the site's "Forgot your password?" sends a Supabase e-mail link, which mail scanning may spend first |
+| "how many hours has Ada worked?" | `status` shows per coder and project: items done, "on items" (the per-item clock, reliable), claim-to-submit (an upper bound) and "sessions" (zero before 2026-10-07, see the status note); the dashboard RAs tab shows the same once migration 004 is in |
 | "a coder left" | `deactivate --email ...` (annotations stay) |
 | "is the security still right?" | fill the TEST_CODER lines in `.env` with two dummy accounts and run `python3 tests/test_coder_permissions.py` (it codes one item as the dummy coder: re-import the project with `--replace` before a real round) |
 
